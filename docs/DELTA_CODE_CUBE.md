@@ -31,6 +31,490 @@ Código → [Lexical, Structural, Semantic] → Punto en Cubo 3D
 
 ---
 
+## Arquitecturas Alternativas Evaluadas
+
+Durante el diseño se evaluaron 3 arquitecturas diferentes para aplicar el concepto de "cubo diferencial" a la indexación de código. A continuación se documenta cada una con sus ventajas, desventajas y razones de elección.
+
+### Arquitectura A: Deltas como Niveles de Abstracción Jerárquica
+
+**Concepto**: Representar el código en capas incrementales de abstracción, donde cada delta agrega un nivel de agrupación.
+
+```
+L₀  = Base (Tokens individuales)
+     │
+     ▼ Δ₁ (agrupación)
+L₁  = Statements (líneas de código)
+     │
+     ▼ Δ₂ (agrupación)
+L₂  = Functions (bloques funcionales)
+     │
+     ▼ Δ₃ (agrupación)
+L₃  = Modules (archivos completos)
+     │
+     ▼ Δ₄ (agrupación)
+L₄  = Domains (clustering semántico)
+
+Fórmula: Abstracción_n = Base + Σ(Δᵢ) donde cada Δ agrega información de agrupación
+```
+
+#### Implementación Conceptual
+
+```python
+class CodeAbstractionCube:
+    """
+    Sistema de indexación por niveles de abstracción.
+    """
+    def __init__(self, codebase):
+        # Capa base: tokens individuales
+        self.base = TokenIndex(codebase)      # TF-IDF de términos
+
+        # Deltas como niveles de abstracción
+        self.deltas = [
+            StatementDelta(),   # Δ₁: agrupa tokens → statements
+            FunctionDelta(),    # Δ₂: agrupa statements → funciones
+            ModuleDelta(),      # Δ₃: agrupa funciones → módulos
+            DomainDelta(),      # Δ₄: clustering semántico (auth, db, ui, etc)
+        ]
+
+    def search(self, query, level="auto"):
+        """
+        Busca en un nivel específico o en todos.
+
+        Args:
+            query: Texto de búsqueda
+            level: 0=tokens, 1=statements, 2=functions, 3=modules, 4=domains, "auto"=todos
+        """
+        if level == "auto":
+            # Busca en todos los niveles, pondera resultados por varianza
+            return self._multi_level_search(query)
+
+        # Reconstruir nivel específico
+        abstraction = self._reconstruct_level(level)
+        return abstraction.search(query)
+
+    def _reconstruct_level(self, n):
+        """Reconstruye nivel n: Base + Δ₁ + Δ₂ + ... + Δₙ"""
+        result = self.base.copy()
+        for i in range(n):
+            result = result + self.deltas[i]
+        return result
+```
+
+#### Ejemplo de Búsqueda Multi-Nivel
+
+```
+Query: "validate user authentication"
+
+Nivel 0 (Tokens):
+  - Encuentra: "validate", "user", "auth" en 50 ubicaciones
+  - Muy granular, muchos falsos positivos
+
+Nivel 1 (Statements):
+  - Encuentra: if (validateUser(auth)) en 15 líneas
+  - Más específico
+
+Nivel 2 (Functions):
+  - Encuentra: function validateUserAuth() {} en 3 funciones
+  - Contexto funcional
+
+Nivel 3 (Modules):
+  - Encuentra: auth.js, middleware/session.js
+  - Contexto de archivo
+
+Nivel 4 (Domains):
+  - Encuentra: todo el dominio "auth"
+  - Máxima abstracción
+
+Resultado Auto: Pondera y combina niveles 2-3 (balance entre precisión y contexto)
+```
+
+#### Ventajas
+
+✅ **Elegancia conceptual**: Aprovecha jerarquía natural del código (tokens → statements → funciones → módulos)
+
+✅ **Flexibilidad de consulta**: Usuario puede elegir nivel de detalle deseado
+
+✅ **Navegación natural**: Fácil "zoom in/out" entre niveles de abstracción
+
+✅ **Alineado con comprensión humana**: Los desarrolladores piensan en estos niveles
+
+#### Desventajas
+
+❌ **Complejidad de implementación**: Requiere AST parsing robusto para detectar boundaries (statements, funciones)
+
+❌ **Dependencia de lenguaje**: AST diferente por lenguaje (JS, Python, Go, etc)
+
+❌ **Costo computacional**: Construir jerarquía completa es costoso
+
+❌ **Ambigüedad en deltas**: ¿Qué es un "statement" en código sin puntos y comas (Python)? ¿Lambdas son funciones?
+
+#### Decisión
+
+**No seleccionada para v1** - Reservada para v2 si se justifica la complejidad de AST parsing completo.
+
+---
+
+### Arquitectura B: Multi-Motor Paralelo (No-Diferencial)
+
+**Concepto**: Múltiples índices independientes (no deltas), cada uno especializado en un tipo de búsqueda. Resultados se fusionan con pesos.
+
+```
+                    Query: "validate email"
+                            │
+        ┌───────────────────┼───────────────────┐
+        │                   │                   │
+   ┌────▼─────┐      ┌──────▼──────┐      ┌────▼─────┐
+   │  Motor   │      │   Motor     │      │  Motor   │
+   │  TF-IDF  │      │    AST      │      │  Graph   │
+   │          │      │             │      │          │
+   │ (lexical)│      │(structural) │      │ (deps)   │
+   └────┬─────┘      └──────┬──────┘      └────┬─────┘
+        │                   │                   │
+        │  Score: 0.8       │  Score: 0.6       │  Score: 0.9
+        │                   │                   │
+        └───────────────────┼───────────────────┘
+                            │
+                   ┌────────▼─────────┐
+                   │  Hybrid Merger   │
+                   │  w₁·s₁ + w₂·s₂  │
+                   │    + w₃·s₃      │
+                   └────────┬─────────┘
+                            │
+                      Results Ranked
+```
+
+#### Implementación Conceptual
+
+```python
+class MultiEngineCodeSearch:
+    """
+    Búsqueda con múltiples motores independientes.
+    """
+    def __init__(self, codebase):
+        # Cada motor indexa TODO el código de forma independiente
+        self.engines = {
+            'lexical': TFIDFEngine(codebase),        # Términos
+            'structural': ASTEngine(codebase),        # Estructura sintáctica
+            'semantic': EmbeddingEngine(codebase),    # Embeddings (OpenAI/local)
+            'graph': DependencyEngine(codebase),      # Grafo de imports
+        }
+
+        # Pesos por defecto (ajustables por usuario)
+        self.weights = {
+            'lexical': 0.3,
+            'structural': 0.2,
+            'semantic': 0.3,
+            'graph': 0.2,
+        }
+
+    def search(self, query, engines=None, weights=None):
+        """
+        Busca con motores seleccionados y fusiona resultados.
+        """
+        engines = engines or list(self.engines.keys())
+        weights = weights or self.weights
+
+        # Ejecutar búsquedas en paralelo
+        results = {}
+        for engine_name in engines:
+            results[engine_name] = self.engines[engine_name].search(query)
+
+        # Fusionar resultados con pesos
+        return self._merge_results(results, weights)
+
+    def _merge_results(self, results, weights):
+        """
+        Fusión por scoring ponderado.
+
+        Para cada archivo, score final = Σ(weight_i × score_i)
+        """
+        merged = defaultdict(float)
+
+        for engine, engine_results in results.items():
+            w = weights[engine]
+            for file_path, score in engine_results:
+                merged[file_path] += w * score
+
+        # Ordenar por score descendente
+        return sorted(merged.items(), key=lambda x: x[1], reverse=True)
+```
+
+#### Ejemplo de Búsqueda
+
+```
+Query: "authentication middleware"
+
+Motor Lexical (TF-IDF):
+  1. auth.js (score: 0.85) - tiene ambos términos
+  2. middleware.js (score: 0.72)
+  3. session.js (score: 0.43)
+
+Motor Structural (AST):
+  1. middleware.js (score: 0.91) - tiene patrón middleware
+  2. auth.js (score: 0.54)
+  3. api.js (score: 0.33)
+
+Motor Semantic (Embeddings):
+  1. auth.js (score: 0.88) - dominio auth
+  2. session.js (score: 0.79) - relacionado
+  3. middleware.js (score: 0.61)
+
+Motor Graph (Dependencies):
+  1. auth.js (score: 0.95) - hub de dependencias
+  2. middleware.js (score: 0.72)
+  3. api.js (score: 0.44)
+
+Fusión (w_lex=0.3, w_struct=0.2, w_sem=0.3, w_graph=0.2):
+  1. auth.js (0.805) ← mejor combinación
+  2. middleware.js (0.705)
+  3. session.js (0.498)
+```
+
+#### Ventajas
+
+✅ **Simplicidad arquitectónica**: Cada motor es independiente, más fácil de mantener
+
+✅ **Paralelización**: Búsquedas pueden ejecutarse en paralelo
+
+✅ **Modularidad**: Agregar/quitar motores sin afectar otros
+
+✅ **Flexibilidad**: Usuario controla qué motores usar y con qué pesos
+
+✅ **Sin dependencias entre motores**: Fallos aislados
+
+#### Desventajas
+
+❌ **Redundancia de almacenamiento**: Cada motor indexa TODO el código
+
+❌ **No aprovecha concepto de deltas**: No es un "cubo diferencial" realmente
+
+❌ **Tunning de pesos complejo**: Difícil encontrar pesos óptimos
+
+❌ **Escalabilidad**: N motores = N veces el espacio de almacenamiento
+
+❌ **Menos innovador**: Approach común (Elasticsearch, etc)
+
+#### Decisión
+
+**No seleccionada** - Aunque simple, no aprovecha la innovación del concepto de "cubo diferencial" de EVA4. Es un sistema multi-índice tradicional.
+
+---
+
+### Arquitectura C: Cubo 3D de Features (SELECCIONADA)
+
+**Concepto**: Representar cada archivo como un punto en espacio 3D (Lexical, Structural, Semantic). Los deltas capturan movimiento cuando el código cambia.
+
+```
+                     Semantic (Z)
+                         │
+                         │   ┌─────────────┐
+                         │  /  dashboard  /│
+                         │ /   .js       /─┼────► Structural (Y)
+                         │/─────────────/  │      (complexity, LOC, imports)
+                         │               │
+        auth.js ●────────┼────────●      │
+                         │     api.js    │
+                        /                │
+                       /                 │
+        Lexical (X) ◄──────────────────────────┘
+        (TF-IDF scores)
+
+
+        DELTA cuando auth.js cambia:
+
+        Antes: auth.js @ (0.3, 0.5, 0.8)
+        Después: auth.js @ (0.3, 0.7, 0.8)  ← movimiento en Y (structural)
+
+        Delta = (0.0, +0.2, 0.0)
+        → Cambio principalmente ESTRUCTURAL
+```
+
+#### Implementación Conceptual
+
+```python
+class DeltaCodeCube:
+    """
+    Cubo 3D donde código = punto, cambios = deltas.
+    """
+    def __init__(self, codebase):
+        self.code_points = {}  # {file_path: CodePoint}
+        self.deltas = []       # Historial de movimientos
+        self.contracts = []    # Grafo de dependencias
+
+        # Indexar todo el código
+        for file_path in codebase:
+            self.code_points[file_path] = self._build_code_point(file_path)
+
+        # Detectar contratos (imports)
+        self._detect_contracts()
+
+    def _build_code_point(self, file_path):
+        """
+        Construye punto 3D para un archivo.
+
+        Returns:
+            CodePoint con position = [lexical (50d), structural (8d), semantic (5d)]
+        """
+        content = read_file(file_path)
+
+        return CodePoint(
+            file_path=file_path,
+            lexical=extract_lexical_features(content),      # [50 dims]
+            structural=extract_structural_features(content), # [8 dims]
+            semantic=extract_semantic_features(content),     # [5 dims]
+        )
+
+    def on_file_change(self, file_path, new_content):
+        """
+        Detecta impacto de cambio en un archivo.
+        """
+        # 1. Calcular nuevo CodePoint
+        old_point = self.code_points[file_path]
+        new_point = self._build_code_point_from_content(file_path, new_content)
+
+        # 2. Crear Delta
+        delta = Delta(
+            code_point_id=file_path,
+            old_position=old_point.position,
+            new_position=new_point.position,
+            movement=new_point.position - old_point.position,
+            magnitude=np.linalg.norm(new_point.position - old_point.position),
+        )
+
+        # 3. Detectar tensiones en contratos
+        tensions = self._detect_tensions(old_point, new_point, delta)
+
+        # 4. Actualizar
+        self.code_points[file_path] = new_point
+        self.deltas.append(delta)
+
+        return TensionReport(delta=delta, tensions=tensions)
+
+    def _detect_tensions(self, old_point, new_point, delta):
+        """
+        Detecta contratos rotos por el cambio.
+
+        Tensión = |nueva_distancia - baseline_distancia|
+        """
+        tensions = []
+
+        # Buscar contratos donde este archivo es callee
+        for contract in self.contracts:
+            if contract.callee_id == old_point.file_path:
+                caller = self.code_points[contract.caller_id]
+
+                new_distance = caller.distance_to(new_point)
+                tension_magnitude = abs(new_distance - contract.baseline_distance)
+
+                if tension_magnitude > THRESHOLD:
+                    tensions.append(Tension(
+                        contract=contract,
+                        delta=delta,
+                        magnitude=tension_magnitude,
+                    ))
+
+        return tensions
+
+    def search(self, query, axis=None):
+        """
+        Búsqueda por similaridad en el cubo.
+
+        Args:
+            query: Texto o CodePoint de referencia
+            axis: 'lexical', 'structural', 'semantic', None (todos)
+        """
+        query_point = self._query_to_code_point(query)
+
+        results = []
+        for file_path, code_point in self.code_points.items():
+            if axis:
+                # Distancia solo en eje específico
+                distance = self._distance_in_axis(query_point, code_point, axis)
+            else:
+                # Distancia euclidiana completa
+                distance = query_point.distance_to(code_point)
+
+            results.append((file_path, distance))
+
+        # Ordenar por distancia (menor = más similar)
+        return sorted(results, key=lambda x: x[1])
+```
+
+#### Ventajas
+
+✅ **Innovador**: Aprovecha concepto de cubo diferencial de EVA4
+
+✅ **Detección predictiva de impacto**: Predice qué se rompe ANTES de que compile
+
+✅ **Queries complejas**: "Similar en estructura pero diferente en semántica"
+
+✅ **Visualizable**: Puede exportarse a 3D para visualización
+
+✅ **Balance complejidad/valor**: No requiere AST completo pero aporta valor único
+
+✅ **Extensible**: Fácil agregar más dimensiones (security, performance, etc)
+
+#### Desventajas
+
+⚠️ **Requiere tunning**: Threshold de tensión, pesos de features
+
+⚠️ **Features heurísticas**: Sin AST, structural features son aproximadas
+
+⚠️ **Experimental**: No hay herramientas existentes para comparar
+
+⚠️ **Falsos positivos**: Puede detectar tensiones en cambios benignos
+
+#### Decisión
+
+**✅ SELECCIONADA** - Mejor balance entre innovación, complejidad de implementación y valor aportado. Permite empezar simple (sin AST) y evolucionar.
+
+---
+
+## Comparación de Arquitecturas
+
+| Criterio | Arquitectura A (Jerarquías) | Arquitectura B (Multi-Motor) | Arquitectura C (Cubo 3D) ✅ |
+|----------|----------------------------|----------------------------|---------------------------|
+| **Innovación** | Alta | Baja | Muy Alta |
+| **Complejidad implementación** | Alta (AST necesario) | Media | Media |
+| **Dependencias externas** | AST parser | Múltiples | Mínimas |
+| **Concepto diferencial** | ✅ Sí | ❌ No | ✅ Sí |
+| **Detección de impacto** | Limitada | No | ✅ Excelente |
+| **Escalabilidad** | Media | Baja (N índices) | Alta |
+| **Extensibilidad** | Media | Alta | Alta |
+| **Multi-lenguaje** | Difícil (N parsers) | Media | ✅ Fácil |
+| **Visualización** | Jerárquica | No natural | ✅ 3D intuitivo |
+
+---
+
+## Evolución Futura
+
+### Fase 2: Combinar A + C
+
+Posible evolución que combine lo mejor de ambas:
+
+```
+DeltaCodeCube v2:
+
+Eje X: Lexical (TF-IDF)
+Eje Y: Structural (desde features heurísticas)
+Eje Z: Semantic (dominios)
+
+PLUS:
+
+Eje W (4D): Hierarchical Level
+  - 0 = Token
+  - 1 = Statement
+  - 2 = Function
+  - 3 = Module
+  - 4 = Domain
+
+→ Búsqueda en hipercubo 4D con filtros por nivel jerárquico
+```
+
+Esto requeriría AST parsing pero mantendría beneficios del cubo 3D.
+
+---
+
 ## Arquitectura del Sistema
 
 ### Vista General
