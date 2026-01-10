@@ -1,0 +1,14 @@
+"""
+DeltaCodeCube - Sistema de indexación multidimensional para código.
+
+Representa código como puntos en espacio 3D (Lexical, Structural, Semantic)
+para búsqueda multidimensional y detección de impacto de cambios.
+"""
+
+from bigcontext_mcp.cube.code_point import CodePoint
+from bigcontext_mcp.cube.cube import DeltaCodeCube
+
+__all__ = [
+    "CodePoint",
+    "DeltaCodeCube",
+]
