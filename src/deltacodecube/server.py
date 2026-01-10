@@ -549,11 +549,10 @@ def cube_export_html(
 
         # Get data for visualization
         positions = cube.export_positions(format="3d")
-        code_points = positions.get("positions", [])
+        code_points = positions.get("points", [])
 
         # Get contracts
-        contracts_result = cube.get_contracts(limit=500)
-        contracts = contracts_result.get("contracts", [])
+        contracts = cube.get_contracts(limit=500)
 
         # Get active tensions
         tension_detector = TensionDetector(conn)
