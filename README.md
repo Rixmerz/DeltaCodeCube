@@ -1,17 +1,18 @@
 # DeltaCodeCube
 
-**Multi-dimensional code indexing for MCP** - Represent code as points in 63D feature space for similarity search, impact analysis, and change detection.
+**Multi-dimensional code indexing for MCP** - Represent code as points in 86D feature space for similarity search, impact analysis, and change detection.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 
 ## What is DeltaCodeCube?
 
-DeltaCodeCube is an MCP server that indexes your codebase as points in a 63-dimensional feature space. Each file becomes a coordinate based on:
+DeltaCodeCube is an MCP server that indexes your codebase as points in an 86-dimensional feature space. Each file becomes a coordinate based on:
 
-- **Lexical features (50D)**: TF-IDF vocabulary fingerprint
-- **Structural features (8D)**: Functions, classes, imports, complexity
-- **Semantic features (5D)**: Domain classification (auth, db, api, ui, util)
+- **Lexical features (65D)**: TF-IDF unigrams (50) + code bigrams (15)
+- **Structural features (16D)**: Basic metrics (8) + Halstead complexity (5) + Coupling (3)
+- **Semantic features (5D+)**: Domain classification (configurable per project)
+- **Temporal features (5D)**: Git history metrics (optional)
 
 This enables powerful capabilities:
 
@@ -69,7 +70,7 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS)
 }
 ```
 
-Restart Claude Code/Desktop. 18 tools will be available.
+Restart Claude Code/Desktop. 27 tools will be available.
 
 ## Tools
 
@@ -79,7 +80,7 @@ Restart Claude Code/Desktop. 18 tools will be available.
 |------|-------------|
 | `cube_index_file` | Index a single code file |
 | `cube_index_directory` | Index all files in a directory |
-| `cube_get_position` | Get file's 63D coordinates |
+| `cube_get_position` | Get file's 86D coordinates |
 | `cube_find_similar` | Find similar files by distance |
 | `cube_search_by_domain` | Search by semantic domain |
 | `cube_get_stats` | Get cube statistics |
@@ -102,19 +103,38 @@ Restart Claude Code/Desktop. 18 tools will be available.
 | `cube_resolve_tension` | Mark tension as resolved/ignored |
 | `cube_get_deltas` | Get recent code movements |
 
-### Advanced Search (3 tools)
+### Graph Analysis (2 tools)
+
+| Tool | Description |
+|------|-------------|
+| `cube_analyze_graph` | Compute PageRank, HITS, betweenness centrality |
+| `cube_get_centrality` | Get centrality metrics for a specific file |
+
+### Intelligence (5 tools)
+
+| Tool | Description |
+|------|-------------|
+| `cube_detect_smells` | Detect code smells (god files, circular deps, etc.) |
+| `cube_cluster_files` | Automatically cluster similar files |
+| `cube_get_suggestions` | Get prioritized refactoring suggestions |
+| `cube_simulate_wave` | Simulate tension wave propagation |
+| `cube_predict_impact` | Predict impact of changing a file |
+
+### Visualization & Export (4 tools)
 
 | Tool | Description |
 |------|-------------|
 | `cube_compare` | Compare two files in detail |
-| `cube_export_positions` | Export for visualization |
+| `cube_export_positions` | Export positions for external tools |
+| `cube_export_html` | Generate interactive 3D HTML visualization |
 | `cube_find_by_criteria` | Multi-criteria search |
 
-### Suggestions (1 tool)
+### Analysis (2 tools)
 
 | Tool | Description |
 |------|-------------|
 | `cube_suggest_fix` | Generate fix context for tensions |
+| `cube_get_temporal` | Get git history metrics for a file |
 
 ## Usage Examples
 
@@ -169,23 +189,46 @@ Suggested action: Review api/routes.js - auth.js had terminology changes
 
 ## How It Works
 
-### The 63D Feature Space
+### The 86D Feature Space
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                    63D Feature Space                     │
-├──────────────────┬──────────────────┬───────────────────┤
-│  Lexical (50D)   │ Structural (8D)  │  Semantic (5D)    │
-├──────────────────┼──────────────────┼───────────────────┤
-│ TF-IDF vectors   │ function_count   │ auth_score        │
-│ of top 50 terms  │ class_count      │ db_score          │
-│ in vocabulary    │ import_count     │ api_score         │
-│                  │ export_count     │ ui_score          │
-│                  │ complexity       │ util_score        │
-│                  │ nesting_depth    │                   │
-│                  │ comment_ratio    │                   │
-│                  │ line_count       │                   │
-└──────────────────┴──────────────────┴───────────────────┘
+Lexical (65D)              Structural (16D)           Semantic (5D+)
+─────────────              ────────────────           ──────────────
+Unigrams (50D):            Basic (8D):                Configurable:
+- TF-IDF vectors           - loc_normalized           - auth_score
+- Top 50 vocab terms       - num_functions            - db_score
+                           - num_classes              - api_score
+Bigrams (15D):             - num_imports              - ui_score
+- async_await              - avg_indent               - util_score
+- try_catch                - comment_ratio
+- if_else                  - cyclomatic_estimate      Custom domains via
+- return_value             - export_count             .deltacodecube.json
+- throw_error
+- etc.                     Halstead (5D):
+                           - vocabulary               ─────────────────────
+Uses cosine similarity     - volume                   Optional: Temporal (5D)
+for distance calculation   - difficulty               - file_age
+                           - effort                   - change_frequency
+                           - bugs_estimate            - author_diversity
+                                                      - days_since_change
+                           Coupling (3D):             - stability_score
+                           - import_diversity
+                           - export_ratio
+                           - coupling_estimate
+```
+
+### Custom Domains
+
+Create `.deltacodecube.json` in your project root:
+
+```json
+{
+  "domains": {
+    "payments": ["stripe", "payment", "invoice", "billing"],
+    "notifications": ["email", "sms", "push", "notification"],
+    "ml": ["model", "train", "predict", "embedding"]
+  }
+}
 ```
 
 ### Contracts
@@ -201,10 +244,21 @@ When you re-index a file after changes, a Delta is created recording:
 
 ### Tensions
 
-When a file changes, its distance to dependent files is recalculated. If the distance deviates >15% from baseline, a Tension is created - indicating the change may have broken something.
+When a file changes, its distance to dependent files is recalculated. DeltaCodeCube uses **adaptive thresholds** that learn from each file's change history:
+
+- Files with stable history → lower threshold (more sensitive)
+- Files with volatile history → higher threshold (fewer false positives)
+- Falls back to 15% default if insufficient history
 
 ## Technical Details
 
+- **Core Dimensions**: 86D feature space (65 lexical + 16 structural + 5 semantic)
+- **Optional Dimensions**: +5D temporal features (requires git)
+- **Distance metric**: Cosine similarity (better for sparse TF-IDF vectors)
+- **Lexical**: TF-IDF unigrams + code pattern bigrams (async_await, try_catch, etc.)
+- **Complexity**: Halstead metrics + coupling/cohesion estimates
+- **Thresholds**: Adaptive based on file change history (mean + 2σ)
+- **Visualization**: Interactive 3D HTML export (no external dependencies)
 - **Languages supported**: JavaScript, TypeScript, Python, Go, Java
 - **Storage**: SQLite with WAL mode
 - **Framework**: FastMCP 2.x

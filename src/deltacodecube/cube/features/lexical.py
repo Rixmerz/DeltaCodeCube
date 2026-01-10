@@ -2,7 +2,12 @@
 Lexical feature extractor for code files.
 
 Extracts TF-IDF based features projected to a fixed vocabulary.
-Returns 50 dimensions representing term importance scores.
+Includes both unigrams (single terms) and n-grams (term patterns).
+
+Dimensions:
+- 50 unigrams: Single term frequencies
+- 15 bigrams: Two-term patterns (e.g., "async await", "try catch")
+- Total: 65 dimensions
 """
 
 import re
@@ -11,8 +16,10 @@ from typing import Any
 
 import numpy as np
 
-# Feature dimension
-LEXICAL_DIMS = 50
+# Feature dimensions
+UNIGRAM_DIMS = 50
+BIGRAM_DIMS = 15
+LEXICAL_DIMS = UNIGRAM_DIMS + BIGRAM_DIMS  # 65 total
 
 # Default vocabulary of important code terms
 # This can be dynamically updated based on corpus
@@ -110,53 +117,105 @@ DEFAULT_VOCABULARY = [
     "id",
 ]
 
-# Ensure we have exactly LEXICAL_DIMS terms
-_vocab = DEFAULT_VOCABULARY[:LEXICAL_DIMS]
-while len(_vocab) < LEXICAL_DIMS:
+# Ensure we have exactly UNIGRAM_DIMS terms
+_vocab = DEFAULT_VOCABULARY[:UNIGRAM_DIMS]
+while len(_vocab) < UNIGRAM_DIMS:
     _vocab.append(f"term_{len(_vocab)}")
 
 VOCABULARY = _vocab
+
+# Common code bigrams (two-term patterns)
+DEFAULT_BIGRAMS = [
+    # Async patterns
+    "async_await",
+    "async_function",
+    "await_promise",
+    # Error handling
+    "try_catch",
+    "catch_error",
+    "throw_error",
+    "throw_new",
+    # Control flow
+    "if_else",
+    "else_if",
+    "for_loop",
+    "while_loop",
+    # Function patterns
+    "return_value",
+    "return_null",
+    "return_false",
+    "return_true",
+    # Common operations
+    "get_set",
+]
+
+# Ensure we have exactly BIGRAM_DIMS
+_bigrams = DEFAULT_BIGRAMS[:BIGRAM_DIMS]
+while len(_bigrams) < BIGRAM_DIMS:
+    _bigrams.append(f"bigram_{len(_bigrams)}")
+
+BIGRAM_VOCABULARY = _bigrams
 
 
 def extract_lexical_features(
     content: str,
     vocabulary: list[str] | None = None,
+    bigram_vocabulary: list[str] | None = None,
 ) -> np.ndarray:
     """
     Extract lexical features from code content.
 
-    Calculates term frequency for vocabulary terms and normalizes.
+    Calculates term frequency for vocabulary terms (unigrams) and
+    bigram patterns, then normalizes.
 
     Args:
         content: Source code content as string.
-        vocabulary: Optional custom vocabulary. Uses default if not provided.
+        vocabulary: Optional custom unigram vocabulary.
+        bigram_vocabulary: Optional custom bigram vocabulary.
 
     Returns:
-        NumPy array of 50 normalized TF scores.
+        NumPy array of 65 normalized features (50 unigrams + 15 bigrams).
     """
     vocab = vocabulary or VOCABULARY
+    bigrams = bigram_vocabulary or BIGRAM_VOCABULARY
 
-    # Ensure vocabulary has correct size
-    if len(vocab) != LEXICAL_DIMS:
-        vocab = vocab[:LEXICAL_DIMS]
-        while len(vocab) < LEXICAL_DIMS:
+    # Ensure vocabularies have correct size
+    if len(vocab) != UNIGRAM_DIMS:
+        vocab = vocab[:UNIGRAM_DIMS]
+        while len(vocab) < UNIGRAM_DIMS:
             vocab.append(f"term_{len(vocab)}")
+
+    if len(bigrams) != BIGRAM_DIMS:
+        bigrams = bigrams[:BIGRAM_DIMS]
+        while len(bigrams) < BIGRAM_DIMS:
+            bigrams.append(f"bigram_{len(bigrams)}")
 
     # Tokenize content (extract words)
     tokens = _tokenize(content)
-
-    # Count term frequencies
-    term_counts = Counter(tokens)
     total_terms = len(tokens) or 1
+
+    # Count unigram frequencies
+    term_counts = Counter(tokens)
+
+    # Extract bigrams from token sequence
+    token_bigrams = _extract_bigrams(tokens)
+    bigram_counts = Counter(token_bigrams)
 
     # Build feature vector
     features = np.zeros(LEXICAL_DIMS, dtype=np.float64)
 
+    # Unigram features (first 50 dimensions)
     for i, term in enumerate(vocab):
         count = term_counts.get(term.lower(), 0)
-        # Term frequency (normalized by document length)
         tf = count / total_terms
         features[i] = tf
+
+    # Bigram features (next 15 dimensions)
+    total_bigrams = len(token_bigrams) or 1
+    for i, bigram in enumerate(bigrams):
+        count = bigram_counts.get(bigram, 0)
+        tf = count / total_bigrams
+        features[UNIGRAM_DIMS + i] = tf
 
     # L2 normalize the vector
     norm = np.linalg.norm(features)
@@ -164,6 +223,23 @@ def extract_lexical_features(
         features = features / norm
 
     return features
+
+
+def _extract_bigrams(tokens: list[str]) -> list[str]:
+    """
+    Extract bigrams from token sequence.
+
+    Creates underscore-joined pairs of consecutive tokens.
+    """
+    if len(tokens) < 2:
+        return []
+
+    bigrams = []
+    for i in range(len(tokens) - 1):
+        bigram = f"{tokens[i]}_{tokens[i + 1]}"
+        bigrams.append(bigram)
+
+    return bigrams
 
 
 def _tokenize(content: str) -> list[str]:

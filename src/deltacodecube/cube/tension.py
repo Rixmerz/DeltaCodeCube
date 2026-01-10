@@ -4,11 +4,14 @@ Tension - Detects when code changes break contract expectations.
 A Tension is created when a code file changes and its distance to dependent
 files deviates significantly from the baseline_distance recorded in contracts.
 This indicates that the change may have broken implicit dependencies.
+
+Features adaptive thresholds based on historical change patterns per file.
 """
 
 import hashlib
 import json
 import sqlite3
+import statistics
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -25,6 +28,12 @@ logger = get_logger(__name__)
 
 # Default threshold for tension detection (relative change from baseline)
 DEFAULT_TENSION_THRESHOLD = 0.15  # 15% change from baseline
+
+# Minimum samples required for adaptive threshold
+MIN_SAMPLES_FOR_ADAPTIVE = 3
+
+# Number of standard deviations for adaptive threshold
+ADAPTIVE_STDEV_MULTIPLIER = 2.0
 
 
 @dataclass
@@ -145,18 +154,83 @@ class Tension:
 class TensionDetector:
     """
     Detects and manages tensions when code changes.
+
+    Features adaptive thresholds that learn from historical change patterns.
+    If a file typically has small changes, the threshold is lower.
+    If a file frequently has larger changes, the threshold adjusts accordingly.
     """
 
-    def __init__(self, conn: sqlite3.Connection, threshold: float = DEFAULT_TENSION_THRESHOLD):
+    def __init__(
+        self,
+        conn: sqlite3.Connection,
+        threshold: float = DEFAULT_TENSION_THRESHOLD,
+        use_adaptive: bool = True,
+    ):
         """
         Initialize TensionDetector.
 
         Args:
             conn: SQLite connection (should have dict_factory row_factory).
-            threshold: Minimum relative change to trigger tension (default: 15%).
+            threshold: Default minimum relative change to trigger tension (15%).
+            use_adaptive: Whether to use adaptive thresholds based on history.
         """
         self.conn = conn
-        self.threshold = threshold
+        self.default_threshold = threshold
+        self.use_adaptive = use_adaptive
+
+    def get_adaptive_threshold(self, code_point_id: str) -> float:
+        """
+        Calculate adaptive threshold based on file's change history.
+
+        Uses the mean + 2*stdev of past tension percentages for this file.
+        Falls back to default threshold if insufficient history.
+
+        Args:
+            code_point_id: ID of the code point to get threshold for.
+
+        Returns:
+            Adaptive threshold (or default if insufficient data).
+        """
+        if not self.use_adaptive:
+            return self.default_threshold
+
+        # Get historical deltas for this file
+        cursor = self.conn.execute(
+            """
+            SELECT movement_magnitude
+            FROM deltas
+            WHERE code_point_id = ?
+            ORDER BY created_at DESC
+            LIMIT 20
+            """,
+            (code_point_id,),
+        )
+
+        magnitudes = [row["movement_magnitude"] for row in cursor.fetchall()]
+
+        # Need minimum samples for adaptive
+        if len(magnitudes) < MIN_SAMPLES_FOR_ADAPTIVE:
+            return self.default_threshold
+
+        try:
+            mean = statistics.mean(magnitudes)
+            stdev = statistics.stdev(magnitudes) if len(magnitudes) > 1 else 0
+
+            # Adaptive threshold = mean + 2 standard deviations
+            adaptive = mean + (ADAPTIVE_STDEV_MULTIPLIER * stdev)
+
+            # Clamp to reasonable range (5% to 50%)
+            adaptive = max(0.05, min(0.50, adaptive))
+
+            logger.debug(
+                f"Adaptive threshold for {code_point_id}: {adaptive:.2%} "
+                f"(mean={mean:.2%}, stdev={stdev:.2%}, samples={len(magnitudes)})"
+            )
+
+            return adaptive
+
+        except statistics.StatisticsError:
+            return self.default_threshold
 
     def detect_tensions(
         self,
@@ -217,8 +291,11 @@ class TensionDetector:
             else:
                 tension_percent = tension_magnitude
 
+            # Get adaptive threshold for this file
+            threshold = self.get_adaptive_threshold(new_code_point.id)
+
             # Check if exceeds threshold
-            if tension_percent >= self.threshold:
+            if tension_percent >= threshold:
                 tension = Tension(
                     id=_generate_tension_id(row["id"], delta.id),
                     contract_id=row["id"],

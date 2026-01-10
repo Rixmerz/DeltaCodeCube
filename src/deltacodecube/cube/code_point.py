@@ -1,10 +1,10 @@
 """
 CodePoint - Representation of code as a point in 3D feature space.
 
-A CodePoint represents a code file (or function) as a vector in 63-dimensional space:
-- Lexical features (50 dims): TF-IDF based term importance
-- Structural features (8 dims): Code structure metrics
-- Semantic features (5 dims): Domain classification
+A CodePoint represents a code file (or function) as a vector in 86-dimensional space:
+- Lexical features (65 dims): TF-IDF unigrams (50) + bigrams (15)
+- Structural features (16 dims): Basic (8) + Halstead (5) + Coupling (3)
+- Semantic features (5 dims): Domain classification (configurable)
 """
 
 import hashlib
@@ -26,7 +26,7 @@ from deltacodecube.cube.features.semantic import SEMANTIC_DIMS, get_dominant_dom
 from deltacodecube.cube.features.structural import STRUCTURAL_DIMS
 
 # Total dimensions
-TOTAL_DIMS = LEXICAL_DIMS + STRUCTURAL_DIMS + SEMANTIC_DIMS  # 50 + 8 + 5 = 63
+TOTAL_DIMS = LEXICAL_DIMS + STRUCTURAL_DIMS + SEMANTIC_DIMS  # 65 + 16 + 5 = 86
 
 
 @dataclass
@@ -34,10 +34,10 @@ class CodePoint:
     """
     Represents a code file as a point in 3D feature space.
 
-    The position vector is 63 dimensions:
-    - [0:50] Lexical features
-    - [50:58] Structural features
-    - [58:63] Semantic features
+    The position vector is 86 dimensions:
+    - [0:65] Lexical features (unigrams + bigrams)
+    - [65:81] Structural features (basic + Halstead + coupling)
+    - [81:86] Semantic features (domain classification)
     """
 
     # Identification
@@ -71,7 +71,23 @@ class CodePoint:
         """Get the dominant semantic domain."""
         return get_dominant_domain(self.semantic)
 
-    def distance_to(self, other: "CodePoint") -> float:
+    def distance_to(self, other: "CodePoint", method: str = "cosine") -> float:
+        """
+        Calculate distance to another CodePoint.
+
+        Args:
+            other: Another CodePoint.
+            method: Distance method - "cosine" (default, better for TF-IDF) or "euclidean".
+
+        Returns:
+            Distance between positions.
+        """
+        if method == "cosine":
+            return self.cosine_distance_to(other)
+        else:
+            return self.euclidean_distance_to(other)
+
+    def euclidean_distance_to(self, other: "CodePoint") -> float:
         """
         Calculate Euclidean distance to another CodePoint.
 
@@ -83,25 +99,59 @@ class CodePoint:
         """
         return float(np.linalg.norm(self.position - other.position))
 
-    def distance_in_axis(self, other: "CodePoint", axis: str) -> float:
+    def cosine_distance_to(self, other: "CodePoint") -> float:
+        """
+        Calculate cosine distance to another CodePoint.
+
+        Cosine distance = 1 - cosine similarity.
+        Better for sparse vectors like TF-IDF.
+
+        Args:
+            other: Another CodePoint.
+
+        Returns:
+            Cosine distance (0 = identical, 2 = opposite).
+        """
+        similarity = self.similarity_to(other)
+        return 1.0 - similarity
+
+    def distance_in_axis(self, other: "CodePoint", axis: str, method: str = "cosine") -> float:
         """
         Calculate distance in a specific axis/dimension.
 
         Args:
             other: Another CodePoint.
             axis: One of 'lexical', 'structural', 'semantic'.
+            method: Distance method - "cosine" (default) or "euclidean".
 
         Returns:
-            Euclidean distance in specified dimensions only.
+            Distance in specified dimensions only.
         """
         if axis == "lexical":
-            return float(np.linalg.norm(self.lexical - other.lexical))
+            v1, v2 = self.lexical, other.lexical
         elif axis == "structural":
-            return float(np.linalg.norm(self.structural - other.structural))
+            v1, v2 = self.structural, other.structural
         elif axis == "semantic":
-            return float(np.linalg.norm(self.semantic - other.semantic))
+            v1, v2 = self.semantic, other.semantic
         else:
             raise ValueError(f"Unknown axis: {axis}. Use 'lexical', 'structural', or 'semantic'.")
+
+        if method == "cosine":
+            return self._cosine_distance(v1, v2)
+        else:
+            return float(np.linalg.norm(v1 - v2))
+
+    @staticmethod
+    def _cosine_distance(v1: np.ndarray, v2: np.ndarray) -> float:
+        """Calculate cosine distance between two vectors."""
+        norm1 = np.linalg.norm(v1)
+        norm2 = np.linalg.norm(v2)
+
+        if norm1 == 0 or norm2 == 0:
+            return 1.0  # Maximum distance if either vector is zero
+
+        similarity = float(np.dot(v1, v2) / (norm1 * norm2))
+        return 1.0 - similarity
 
     def similarity_to(self, other: "CodePoint") -> float:
         """

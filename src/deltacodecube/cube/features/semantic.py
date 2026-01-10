@@ -2,24 +2,41 @@
 Semantic feature extractor for code files.
 
 Classifies code by functional domain using keyword presence.
-Returns 5 dimensions representing probability distribution across domains:
+Supports custom domains via .deltacodecube.json configuration.
+
+Default domains (5 dimensions):
 1. auth: Authentication, authorization, security
 2. db: Database, queries, models
 3. api: Routes, endpoints, HTTP
 4. ui: Components, rendering, styles
 5. util: Helpers, utilities, transformations
+
+Custom domains can be configured in .deltacodecube.json:
+{
+  "domains": {
+    "payments": ["stripe", "payment", "invoice"],
+    "ml": ["model", "train", "predict"]
+  }
+}
 """
 
+import json
+import os
 import re
+from pathlib import Path
 from typing import Any
 
 import numpy as np
 
-# Feature dimension
+# Default feature dimension (can change with custom domains)
 SEMANTIC_DIMS = 5
 
-# Domain keywords for classification
-DOMAIN_KEYWORDS: dict[str, list[str]] = {
+# Cache for loaded config
+_config_cache: dict[str, Any] = {}
+_config_path_cache: str | None = None
+
+# Default domain keywords for classification
+DEFAULT_DOMAIN_KEYWORDS: dict[str, list[str]] = {
     "auth": [
         "login",
         "logout",
@@ -178,30 +195,115 @@ DOMAIN_KEYWORDS: dict[str, list[str]] = {
     ],
 }
 
-# Ordered list of domains (matches feature vector order)
-DOMAIN_ORDER = ["auth", "db", "api", "ui", "util"]
+# Default ordered list of domains (matches feature vector order)
+DEFAULT_DOMAIN_ORDER = ["auth", "db", "api", "ui", "util"]
 
 
-def extract_semantic_features(content: str) -> np.ndarray:
+def load_config(project_path: str | None = None) -> dict[str, Any]:
+    """
+    Load configuration from .deltacodecube.json if it exists.
+
+    Args:
+        project_path: Path to project root. If None, uses current directory.
+
+    Returns:
+        Configuration dictionary with domains and other settings.
+    """
+    global _config_cache, _config_path_cache
+
+    # Determine search path
+    if project_path:
+        search_path = Path(project_path)
+    else:
+        search_path = Path.cwd()
+
+    # Look for config file in current dir and parents
+    config_file = None
+    for parent in [search_path] + list(search_path.parents):
+        candidate = parent / ".deltacodecube.json"
+        if candidate.exists():
+            config_file = candidate
+            break
+
+    # Return cached if same path
+    if config_file and str(config_file) == _config_path_cache:
+        return _config_cache
+
+    # No config file, return defaults
+    if not config_file:
+        return {
+            "domains": DEFAULT_DOMAIN_KEYWORDS,
+            "domain_order": DEFAULT_DOMAIN_ORDER,
+        }
+
+    # Load config
+    try:
+        with open(config_file, "r") as f:
+            user_config = json.load(f)
+
+        # Merge with defaults
+        if "domains" in user_config:
+            # User provided custom domains
+            custom_domains = user_config["domains"]
+            domain_order = list(custom_domains.keys())
+
+            config = {
+                "domains": custom_domains,
+                "domain_order": domain_order,
+                "custom": True,
+            }
+        else:
+            # No custom domains, use defaults
+            config = {
+                "domains": DEFAULT_DOMAIN_KEYWORDS,
+                "domain_order": DEFAULT_DOMAIN_ORDER,
+            }
+
+        # Cache it
+        _config_cache = config
+        _config_path_cache = str(config_file)
+
+        return config
+
+    except (json.JSONDecodeError, IOError):
+        return {
+            "domains": DEFAULT_DOMAIN_KEYWORDS,
+            "domain_order": DEFAULT_DOMAIN_ORDER,
+        }
+
+
+def get_semantic_dims(project_path: str | None = None) -> int:
+    """Get number of semantic dimensions based on config."""
+    config = load_config(project_path)
+    return len(config["domain_order"])
+
+
+def extract_semantic_features(content: str, project_path: str | None = None) -> np.ndarray:
     """
     Extract semantic features from code content.
 
     Classifies code by domain based on keyword presence.
-    Returns probability distribution across 5 domains.
+    Uses custom domains from .deltacodecube.json if available.
 
     Args:
         content: Source code content as string.
+        project_path: Optional path to project root for config lookup.
 
     Returns:
-        NumPy array of 5 features (sum approximately 1.0).
+        NumPy array of features (sum approximately 1.0).
     """
+    # Load config (uses cache)
+    config = load_config(project_path)
+    domain_keywords = config["domains"]
+    domain_order = config["domain_order"]
+
     content_lower = content.lower()
 
     # Count keyword hits per domain
     domain_scores: dict[str, int] = {}
 
-    for domain in DOMAIN_ORDER:
-        keywords = DOMAIN_KEYWORDS[domain]
+    for domain in domain_order:
+        keywords = domain_keywords[domain]
         score = 0
 
         for keyword in keywords:
@@ -214,47 +316,69 @@ def extract_semantic_features(content: str) -> np.ndarray:
 
     # Convert to probability distribution
     total = sum(domain_scores.values())
+    num_domains = len(domain_order)
 
     if total == 0:
         # No keywords found, return uniform distribution
-        return np.ones(SEMANTIC_DIMS, dtype=np.float64) / SEMANTIC_DIMS
+        return np.ones(num_domains, dtype=np.float64) / num_domains
 
     # Normalize to sum = 1.0
     features = np.array(
-        [domain_scores[domain] / total for domain in DOMAIN_ORDER],
+        [domain_scores[domain] / total for domain in domain_order],
         dtype=np.float64,
     )
 
     return features
 
 
-def get_domain_names() -> list[str]:
+def get_domain_names(project_path: str | None = None) -> list[str]:
     """Return names of semantic domains in order."""
-    return DOMAIN_ORDER.copy()
+    config = load_config(project_path)
+    return config["domain_order"].copy()
 
 
-def get_dominant_domain(features: np.ndarray) -> str:
+def get_dominant_domain(features: np.ndarray, project_path: str | None = None) -> str:
     """
     Get the dominant domain from semantic features.
 
     Args:
-        features: Semantic feature vector (5 dimensions).
+        features: Semantic feature vector.
+        project_path: Optional path to project root for config lookup.
 
     Returns:
         Name of the domain with highest score.
     """
+    config = load_config(project_path)
+    domain_order = config["domain_order"]
+
     idx = int(np.argmax(features))
-    return DOMAIN_ORDER[idx]
+
+    # Handle case where features might have different length than config
+    if idx < len(domain_order):
+        return domain_order[idx]
+    else:
+        return DEFAULT_DOMAIN_ORDER[idx] if idx < len(DEFAULT_DOMAIN_ORDER) else "unknown"
 
 
-def get_domain_distribution(features: np.ndarray) -> dict[str, float]:
+def get_domain_distribution(features: np.ndarray, project_path: str | None = None) -> dict[str, float]:
     """
     Get domain distribution as dictionary.
 
     Args:
-        features: Semantic feature vector (5 dimensions).
+        features: Semantic feature vector.
+        project_path: Optional path to project root for config lookup.
 
     Returns:
         Dictionary mapping domain names to scores.
     """
-    return {domain: float(features[i]) for i, domain in enumerate(DOMAIN_ORDER)}
+    config = load_config(project_path)
+    domain_order = config["domain_order"]
+
+    return {domain: float(features[i]) for i, domain in enumerate(domain_order) if i < len(features)}
+
+
+def clear_config_cache() -> None:
+    """Clear the configuration cache. Useful when config file changes."""
+    global _config_cache, _config_path_cache
+    _config_cache = {}
+    _config_path_cache = None

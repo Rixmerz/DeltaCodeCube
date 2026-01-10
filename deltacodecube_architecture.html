@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DeltaCodeCube Architecture</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #e4e4e7;
+            min-height: 100vh;
+            overflow: hidden;
+        }
+        h1 {
+            position: absolute;
+            top: 1rem;
+            left: 50%;
+            transform: translateX(-50%);
+            color: #a78bfa;
+            z-index: 100;
+            text-shadow: 0 2px 10px rgba(0,0,0,0.5);
+        }
+        #canvas {
+            width: 100vw;
+            height: 100vh;
+            cursor: grab;
+        }
+        #canvas:active {
+            cursor: grabbing;
+        }
+        .controls {
+            position: absolute;
+            top: 4rem;
+            left: 1rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            z-index: 100;
+        }
+        .control-btn {
+            padding: 0.5rem 1rem;
+            border: 1px solid rgba(167, 139, 250, 0.3);
+            background: rgba(30, 30, 46, 0.8);
+            color: #a78bfa;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .control-btn:hover {
+            background: rgba(167, 139, 250, 0.2);
+        }
+        .legend {
+            position: absolute;
+            bottom: 1rem;
+            left: 1rem;
+            background: rgba(30, 30, 46, 0.9);
+            border: 1px solid rgba(167, 139, 250, 0.3);
+            border-radius: 8px;
+            padding: 1rem;
+            z-index: 100;
+        }
+        .legend-title {
+            font-size: 0.9rem;
+            color: #a78bfa;
+            margin-bottom: 0.5rem;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.8rem;
+            color: #a1a1aa;
+            margin: 0.3rem 0;
+        }
+        .legend-color {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+        }
+        .stats {
+            position: absolute;
+            top: 4rem;
+            right: 1rem;
+            background: rgba(30, 30, 46, 0.9);
+            border: 1px solid rgba(167, 139, 250, 0.3);
+            border-radius: 8px;
+            padding: 1rem;
+            z-index: 100;
+        }
+        .stat {
+            font-size: 0.85rem;
+            color: #a1a1aa;
+            margin: 0.3rem 0;
+        }
+        .stat-value {
+            color: #a78bfa;
+            font-weight: bold;
+        }
+        .tooltip {
+            position: fixed;
+            background: rgba(30, 30, 46, 0.95);
+            border: 1px solid rgba(167, 139, 250, 0.3);
+            border-radius: 8px;
+            padding: 1rem;
+            font-size: 0.85rem;
+            pointer-events: none;
+            z-index: 1000;
+            display: none;
+            max-width: 300px;
+        }
+        .tooltip h4 {
+            color: #a78bfa;
+            margin-bottom: 0.5rem;
+        }
+        .tooltip p {
+            color: #a1a1aa;
+            margin: 0.25rem 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>🏗️ Architecture Diagram</h1>
+
+    <div class="controls">
+        <button class="control-btn" id="resetBtn">Reset View</button>
+        <button class="control-btn" id="toggleLabels">Toggle Labels</button>
+    </div>
+
+    <div class="legend">
+        <div class="legend-title">Domains</div>
+        <div class="legend-item"><div class="legend-color" style="background:#ef4444"></div> Auth</div>
+        <div class="legend-item"><div class="legend-color" style="background:#3b82f6"></div> Database</div>
+        <div class="legend-item"><div class="legend-color" style="background:#22c55e"></div> API</div>
+        <div class="legend-item"><div class="legend-color" style="background:#a78bfa"></div> UI</div>
+        <div class="legend-item"><div class="legend-color" style="background:#71717a"></div> Utility</div>
+    </div>
+
+    <div class="stats" id="stats"></div>
+
+    <canvas id="canvas"></canvas>
+    <div class="tooltip" id="tooltip"></div>
+
+    <script>
+        const nodesData = [{"id": "64cdf96e1950", "path": "/Users/juanpablodiaz/my_projects/whatsapp-bot/public/js/app.js", "name": "app.js", "domain": "api", "lines": 2513, "importance": 0.0, "hub": 0.0, "authority": 0.0, "in_deg": 0, "out_deg": 0}, {"id": "14c6128b1669", "path": "/Users/juanpablodiaz/my_projects/whatsapp-bot/src/server.js", "name": "server.js", "domain": "api", "lines": 96, "importance": 0.5, "hub": 1.0, "authority": 0.0, "in_deg": 0, "out_deg": 11}, {"id": "09fbd99dd4ba", "path": "/Users/juanpablodiaz/my_projects/whatsapp-bot/src/utils/delays.js", "name": "delays.js", "domain": "api", "lines": 39, "importance": 0.0714, "hub": 0.0, "authority": 0.1429, "in_deg": 1, "out_deg": 0}, {"id": "1073cb143218", "path": "/Users/juanpablodiaz/my_projects/whatsapp-bot/src/routes/automation.js", "name": "automation.js", "domain": "api", "lines": 159, "importance": 0.1169, "hub": 0.0909, "authority": 0.1429, "in_deg": 1, "out_deg": 1}, {"id": "b9be4a2a48f5", "path": "/Users/juanpablodiaz/my_projects/whatsapp-bot/src/routes/upload.js", "name": "upload.js", "domain": "api", "lines": 117, "importance": 0.1169, "hub": 0.0909, "authority": 0.1429, "in_deg": 1, "out_deg": 1}, {"id": "5fc43530fc3b", "path": "/Users/juanpablodiaz/my_projects/whatsapp-bot/src/routes/api.js", "name": "api.js", "domain": "api", "lines": 1100, "importance": 0.526, "hub": 0.9091, "authority": 0.1429, "in_deg": 1, "out_deg": 10}, {"id": "fd351f9c82b4", "path": "/Users/juanpablodiaz/my_projects/whatsapp-bot/src/routes/pipeline.js", "name": "pipeline.js", "domain": "api", "lines": 249, "importance": 0.1169, "hub": 0.0909, "authority": 0.1429, "in_deg": 1, "out_deg": 1}, {"id": "dfdbc6c97791", "path": "/Users/juanpablodiaz/my_projects/whatsapp-bot/src/services/database.js", "name": "database.js", "domain": "db", "lines": 204, "importance": 0.5, "hub": 0.0, "authority": 1.0, "in_deg": 7, "out_deg": 0}, {"id": "7d96a8d27ed8", "path": "/Users/juanpablodiaz/my_projects/whatsapp-bot/src/services/automation.js", "name": "automation.js", "domain": "db", "lines": 271, "importance": 0.2338, "hub": 0.1818, "authority": 0.2857, "in_deg": 2, "out_deg": 2}, {"id": "2c3dda889f3e", "path": "/Users/juanpablodiaz/my_projects/whatsapp-bot/src/services/presets.js", "name": "presets.js", "domain": "db", "lines": 388, "importance": 0.1883, "hub": 0.0909, "authority": 0.2857, "in_deg": 2, "out_deg": 1}, {"id": "c6c278f11fcb", "path": "/Users/juanpablodiaz/my_projects/whatsapp-bot/src/services/contactLists.js", "name": "contactLists.js", "domain": "api", "lines": 300, "importance": 0.1883, "hub": 0.0909, "authority": 0.2857, "in_deg": 2, "out_deg": 1}, {"id": "53b6ef225203", "path": "/Users/juanpablodiaz/my_projects/whatsapp-bot/src/services/autoresponder.js", "name": "autoresponder.js", "domain": "util", "lines": 168, "importance": 0.2338, "hub": 0.1818, "authority": 0.2857, "in_deg": 2, "out_deg": 2}, {"id": "189dc46566d8", "path": "/Users/juanpablodiaz/my_projects/whatsapp-bot/src/services/contacts.js", "name": "contacts.js", "domain": "db", "lines": 143, "importance": 0.1429, "hub": 0.0, "authority": 0.2857, "in_deg": 2, "out_deg": 0}, {"id": "148f6d22aa1b", "path": "/Users/juanpablodiaz/my_projects/whatsapp-bot/src/services/scheduler.js", "name": "scheduler.js", "domain": "api", "lines": 213, "importance": 0.2338, "hub": 0.1818, "authority": 0.2857, "in_deg": 2, "out_deg": 2}, {"id": "cfe7a53646d3", "path": "/Users/juanpablodiaz/my_projects/whatsapp-bot/src/services/history.js", "name": "history.js", "domain": "api", "lines": 214, "importance": 0.1883, "hub": 0.0909, "authority": 0.2857, "in_deg": 2, "out_deg": 1}, {"id": "1e9a3ba811d9", "path": "/Users/juanpablodiaz/my_projects/whatsapp-bot/src/services/templates.js", "name": "templates.js", "domain": "ui", "lines": 149, "importance": 0.1429, "hub": 0.0, "authority": 0.2857, "in_deg": 2, "out_deg": 0}, {"id": "76e1024ac206", "path": "/Users/juanpablodiaz/my_projects/whatsapp-bot/src/services/settings.js", "name": "settings.js", "domain": "api", "lines": 172, "importance": 0.2597, "hub": 0.0909, "authority": 0.4286, "in_deg": 3, "out_deg": 1}, {"id": "c9662434ae71", "path": "/Users/juanpablodiaz/my_projects/whatsapp-bot/src/services/neondb.js", "name": "neondb.js", "domain": "db", "lines": 163, "importance": 0.2143, "hub": 0.0, "authority": 0.4286, "in_deg": 3, "out_deg": 0}, {"id": "d538ea53417d", "path": "/Users/juanpablodiaz/my_projects/whatsapp-bot/src/services/pipeline.js", "name": "pipeline.js", "domain": "db", "lines": 388, "importance": 0.1883, "hub": 0.0909, "authority": 0.2857, "in_deg": 2, "out_deg": 1}, {"id": "07322e5ce4dd", "path": "/Users/juanpablodiaz/my_projects/whatsapp-bot/src/whatsapp/client.js", "name": "client.js", "domain": "api", "lines": 130, "importance": 0.2597, "hub": 0.0909, "authority": 0.4286, "in_deg": 3, "out_deg": 1}, {"id": "1626968a3ba5", "path": "/Users/juanpablodiaz/my_projects/whatsapp-bot/src/whatsapp/sender.js", "name": "sender.js", "domain": "util", "lines": 293, "importance": 0.3701, "hub": 0.4545, "authority": 0.2857, "in_deg": 2, "out_deg": 5}, {"id": "34f3e929edcb", "path": "/Users/juanpablodiaz/my_projects/DeltaCodeCube/src/deltacodecube/server.py", "name": "server.py", "domain": "api", "lines": 1184, "importance": 0.0, "hub": 0.0, "authority": 0.0, "in_deg": 0, "out_deg": 0}, {"id": "dd5ee8aac827", "path": "/Users/juanpablodiaz/my_projects/DeltaCodeCube/src/deltacodecube/config.py", "name": "config.py", "domain": "db", "lines": 22, "importance": 0.0, "hub": 0.0, "authority": 0.0, "in_deg": 0, "out_deg": 0}, {"id": "14f204f8cea3", "path": "/Users/juanpablodiaz/my_projects/DeltaCodeCube/src/deltacodecube/__init__.py", "name": "__init__.py", "domain": "auth", "lines": 11, "importance": 0.0, "hub": 0.0, "authority": 0.0, "in_deg": 0, "out_deg": 0}, {"id": "969ba6538b25", "path": "/Users/juanpablodiaz/my_projects/DeltaCodeCube/src/deltacodecube/__main__.py", "name": "__main__.py", "domain": "auth", "lines": 16, "importance": 0.0, "hub": 0.0, "authority": 0.0, "in_deg": 0, "out_deg": 0}, {"id": "d97259b4b20e", "path": "/Users/juanpablodiaz/my_projects/DeltaCodeCube/src/deltacodecube/visualization/__init__.py", "name": "__init__.py", "domain": "ui", "lines": 10, "importance": 0.0, "hub": 0.0, "authority": 0.0, "in_deg": 0, "out_deg": 0}, {"id": "f97f9bccda64", "path": "/Users/juanpablodiaz/my_projects/DeltaCodeCube/src/deltacodecube/visualization/html_export.py", "name": "html_export.py", "domain": "api", "lines": 468, "importance": 0.0, "hub": 0.0, "authority": 0.0, "in_deg": 0, "out_deg": 0}, {"id": "09e172fa91f3", "path": "/Users/juanpablodiaz/my_projects/DeltaCodeCube/src/deltacodecube/cube/suggestions.py", "name": "suggestions.py", "domain": "db", "lines": 524, "importance": 0.0, "hub": 0.0, "authority": 0.0, "in_deg": 0, "out_deg": 0}, {"id": "c4f8ed445e93", "path": "/Users/juanpablodiaz/my_projects/DeltaCodeCube/src/deltacodecube/cube/clustering.py", "name": "clustering.py", "domain": "db", "lines": 492, "importance": 0.0, "hub": 0.0, "authority": 0.0, "in_deg": 0, "out_deg": 0}, {"id": "79d2698f9bd3", "path": "/Users/juanpablodiaz/my_projects/DeltaCodeCube/src/deltacodecube/cube/clones.py", "name": "clones.py", "domain": "util", "lines": 311, "importance": 0.0, "hub": 0.0, "authority": 0.0, "in_deg": 0, "out_deg": 0}, {"id": "97921e2a7f1c", "path": "/Users/juanpablodiaz/my_projects/DeltaCodeCube/src/deltacodecube/cube/advisor.py", "name": "advisor.py", "domain": "api", "lines": 368, "importance": 0.0, "hub": 0.0, "authority": 0.0, "in_deg": 0, "out_deg": 0}, {"id": "41c12ecb633a", "path": "/Users/juanpablodiaz/my_projects/DeltaCodeCube/src/deltacodecube/cube/graph.py", "name": "graph.py", "domain": "db", "lines": 500, "importance": 0.0, "hub": 0.0, "authority": 0.0, "in_deg": 0, "out_deg": 0}, {"id": "703801a4d36e", "path": "/Users/juanpablodiaz/my_projects/DeltaCodeCube/src/deltacodecube/cube/drift.py", "name": "drift.py", "domain": "db", "lines": 324, "importance": 0.0, "hub": 0.0, "authority": 0.0, "in_deg": 0, "out_deg": 0}, {"id": "1457f75766d5", "path": "/Users/juanpablodiaz/my_projects/DeltaCodeCube/src/deltacodecube/cube/__init__.py", "name": "__init__.py", "domain": "auth", "lines": 35, "importance": 0.0, "hub": 0.0, "authority": 0.0, "in_deg": 0, "out_deg": 0}, {"id": "cd1518ef0708", "path": "/Users/juanpablodiaz/my_projects/DeltaCodeCube/src/deltacodecube/cube/smells.py", "name": "smells.py", "domain": "api", "lines": 462, "importance": 0.0, "hub": 0.0, "authority": 0.0, "in_deg": 0, "out_deg": 0}, {"id": "8b822f773fdf", "path": "/Users/juanpablodiaz/my_projects/DeltaCodeCube/src/deltacodecube/cube/cube.py", "name": "cube.py", "domain": "db", "lines": 970, "importance": 0.0, "hub": 0.0, "authority": 0.0, "in_deg": 0, "out_deg": 0}, {"id": "d3e1b0f39768", "path": "/Users/juanpablodiaz/my_projects/DeltaCodeCube/src/deltacodecube/cube/delta.py", "name": "delta.py", "domain": "db", "lines": 289, "importance": 0.0, "hub": 0.0, "authority": 0.0, "in_deg": 0, "out_deg": 0}, {"id": "835a44e753e4", "path": "/Users/juanpablodiaz/my_projects/DeltaCodeCube/src/deltacodecube/cube/contracts.py", "name": "contracts.py", "domain": "db", "lines": 525, "importance": 0.0, "hub": 0.0, "authority": 0.0, "in_deg": 0, "out_deg": 0}, {"id": "a7189b212e80", "path": "/Users/juanpablodiaz/my_projects/DeltaCodeCube/src/deltacodecube/cube/code_point.py", "name": "code_point.py", "domain": "api", "lines": 276, "importance": 0.0, "hub": 0.0, "authority": 0.0, "in_deg": 0, "out_deg": 0}, {"id": "347b857a8565", "path": "/Users/juanpablodiaz/my_projects/DeltaCodeCube/src/deltacodecube/cube/waves.py", "name": "waves.py", "domain": "util", "lines": 360, "importance": 0.0, "hub": 0.0, "authority": 0.0, "in_deg": 0, "out_deg": 0}, {"id": "ba664065252d", "path": "/Users/juanpablodiaz/my_projects/DeltaCodeCube/src/deltacodecube/cube/debt.py", "name": "debt.py", "domain": "db", "lines": 385, "importance": 0.0, "hub": 0.0, "authority": 0.0, "in_deg": 0, "out_deg": 0}, {"id": "53070592c348", "path": "/Users/juanpablodiaz/my_projects/DeltaCodeCube/src/deltacodecube/cube/surface.py", "name": "surface.py", "domain": "api", "lines": 308, "importance": 0.0, "hub": 0.0, "authority": 0.0, "in_deg": 0, "out_deg": 0}, {"id": "21ff822ce3a4", "path": "/Users/juanpablodiaz/my_projects/DeltaCodeCube/src/deltacodecube/cube/tension.py", "name": "tension.py", "domain": "db", "lines": 547, "importance": 0.0, "hub": 0.0, "authority": 0.0, "in_deg": 0, "out_deg": 0}, {"id": "b204f4e4af49", "path": "/Users/juanpablodiaz/my_projects/DeltaCodeCube/src/deltacodecube/cube/features/structural.py", "name": "structural.py", "domain": "db", "lines": 460, "importance": 0.0, "hub": 0.0, "authority": 0.0, "in_deg": 0, "out_deg": 0}, {"id": "fd746af0c481", "path": "/Users/juanpablodiaz/my_projects/DeltaCodeCube/src/deltacodecube/cube/features/temporal.py", "name": "temporal.py", "domain": "util", "lines": 241, "importance": 0.0, "hub": 0.0, "authority": 0.0, "in_deg": 0, "out_deg": 0}, {"id": "10019269137e", "path": "/Users/juanpablodiaz/my_projects/DeltaCodeCube/src/deltacodecube/cube/features/semantic.py", "name": "semantic.py", "domain": "util", "lines": 385, "importance": 0.0, "hub": 0.0, "authority": 0.0, "in_deg": 0, "out_deg": 0}, {"id": "8e67a05ba1e5", "path": "/Users/juanpablodiaz/my_projects/DeltaCodeCube/src/deltacodecube/cube/features/__init__.py", "name": "__init__.py", "domain": "auth", "lines": 24, "importance": 0.0, "hub": 0.0, "authority": 0.0, "in_deg": 0, "out_deg": 0}, {"id": "1fe186f94602", "path": "/Users/juanpablodiaz/my_projects/DeltaCodeCube/src/deltacodecube/cube/features/lexical.py", "name": "lexical.py", "domain": "api", "lines": 321, "importance": 0.0, "hub": 0.0, "authority": 0.0, "in_deg": 0, "out_deg": 0}, {"id": "7bd366259df2", "path": "/Users/juanpablodiaz/my_projects/DeltaCodeCube/src/deltacodecube/cube/visualizations/matrix.py", "name": "matrix.py", "domain": "db", "lines": 451, "importance": 0.0, "hub": 0.0, "authority": 0.0, "in_deg": 0, "out_deg": 0}, {"id": "0d6d43e35016", "path": "/Users/juanpablodiaz/my_projects/DeltaCodeCube/src/deltacodecube/cube/visualizations/heatmap.py", "name": "heatmap.py", "domain": "ui", "lines": 524, "importance": 0.0, "hub": 0.0, "authority": 0.0, "in_deg": 0, "out_deg": 0}, {"id": "6b43a3a2187f", "path": "/Users/juanpablodiaz/my_projects/DeltaCodeCube/src/deltacodecube/cube/visualizations/timeline.py", "name": "timeline.py", "domain": "db", "lines": 505, "importance": 0.0, "hub": 0.0, "authority": 0.0, "in_deg": 0, "out_deg": 0}, {"id": "5f01a38e6b7f", "path": "/Users/juanpablodiaz/my_projects/DeltaCodeCube/src/deltacodecube/cube/visualizations/__init__.py", "name": "__init__.py", "domain": "ui", "lines": 22, "importance": 0.0, "hub": 0.0, "authority": 0.0, "in_deg": 0, "out_deg": 0}, {"id": "c94a40c290fb", "path": "/Users/juanpablodiaz/my_projects/DeltaCodeCube/src/deltacodecube/cube/visualizations/architecture.py", "name": "architecture.py", "domain": "ui", "lines": 633, "importance": 0.0, "hub": 0.0, "authority": 0.0, "in_deg": 0, "out_deg": 0}, {"id": "93255eafbaed", "path": "/Users/juanpablodiaz/my_projects/DeltaCodeCube/src/deltacodecube/utils/__init__.py", "name": "__init__.py", "domain": "util", "lines": 7, "importance": 0.0, "hub": 0.0, "authority": 0.0, "in_deg": 0, "out_deg": 0}, {"id": "9a149d18d6f5", "path": "/Users/juanpablodiaz/my_projects/DeltaCodeCube/src/deltacodecube/utils/logger.py", "name": "logger.py", "domain": "util", "lines": 25, "importance": 0.0, "hub": 0.0, "authority": 0.0, "in_deg": 0, "out_deg": 0}, {"id": "ec38f8e6bccb", "path": "/Users/juanpablodiaz/my_projects/DeltaCodeCube/src/deltacodecube/utils/errors.py", "name": "errors.py", "domain": "util", "lines": 54, "importance": 0.0, "hub": 0.0, "authority": 0.0, "in_deg": 0, "out_deg": 0}, {"id": "7ea1e9dcd5ff", "path": "/Users/juanpablodiaz/my_projects/DeltaCodeCube/src/deltacodecube/db/database.py", "name": "database.py", "domain": "db", "lines": 81, "importance": 0.0, "hub": 0.0, "authority": 0.0, "in_deg": 0, "out_deg": 0}, {"id": "3919e87581ad", "path": "/Users/juanpablodiaz/my_projects/DeltaCodeCube/src/deltacodecube/db/__init__.py", "name": "__init__.py", "domain": "db", "lines": 18, "importance": 0.0, "hub": 0.0, "authority": 0.0, "in_deg": 0, "out_deg": 0}, {"id": "94efb23a7c15", "path": "/Users/juanpablodiaz/my_projects/DeltaCodeCube/src/deltacodecube/db/schema.py", "name": "schema.py", "domain": "db", "lines": 84, "importance": 0.0, "hub": 0.0, "authority": 0.0, "in_deg": 0, "out_deg": 0}];
+        const linksData = [{"source": "14c6128b1669", "target": "dfdbc6c97791", "distance": 1.601}, {"source": "14c6128b1669", "target": "1626968a3ba5", "distance": 1.5401}, {"source": "14c6128b1669", "target": "5fc43530fc3b", "distance": 1.5839}, {"source": "14c6128b1669", "target": "fd351f9c82b4", "distance": 1.3836}, {"source": "14c6128b1669", "target": "b9be4a2a48f5", "distance": 0.7818}, {"source": "14c6128b1669", "target": "7d96a8d27ed8", "distance": 1.5539}, {"source": "14c6128b1669", "target": "1e9a3ba811d9", "distance": 1.3076}, {"source": "14c6128b1669", "target": "1073cb143218", "distance": 1.304}, {"source": "14c6128b1669", "target": "148f6d22aa1b", "distance": 1.2256}, {"source": "14c6128b1669", "target": "c9662434ae71", "distance": 1.2459}, {"source": "14c6128b1669", "target": "07322e5ce4dd", "distance": 1.2333}, {"source": "1073cb143218", "target": "7d96a8d27ed8", "distance": 1.0597}, {"source": "b9be4a2a48f5", "target": "189dc46566d8", "distance": 0.9646}, {"source": "5fc43530fc3b", "target": "148f6d22aa1b", "distance": 1.1515}, {"source": "5fc43530fc3b", "target": "07322e5ce4dd", "distance": 1.5701}, {"source": "5fc43530fc3b", "target": "76e1024ac206", "distance": 1.3844}, {"source": "5fc43530fc3b", "target": "cfe7a53646d3", "distance": 1.3268}, {"source": "5fc43530fc3b", "target": "189dc46566d8", "distance": 1.578}, {"source": "5fc43530fc3b", "target": "53b6ef225203", "distance": 1.2946}, {"source": "5fc43530fc3b", "target": "1e9a3ba811d9", "distance": 1.401}, {"source": "5fc43530fc3b", "target": "2c3dda889f3e", "distance": 1.0492}, {"source": "5fc43530fc3b", "target": "c6c278f11fcb", "distance": 1.1828}, {"source": "5fc43530fc3b", "target": "1626968a3ba5", "distance": 1.1947}, {"source": "fd351f9c82b4", "target": "d538ea53417d", "distance": 1.1058}, {"source": "7d96a8d27ed8", "target": "c9662434ae71", "distance": 0.8482}, {"source": "7d96a8d27ed8", "target": "d538ea53417d", "distance": 0.618}, {"source": "2c3dda889f3e", "target": "dfdbc6c97791", "distance": 1.4762}, {"source": "c6c278f11fcb", "target": "dfdbc6c97791", "distance": 1.6192}, {"source": "53b6ef225203", "target": "76e1024ac206", "distance": 1.0192}, {"source": "53b6ef225203", "target": "dfdbc6c97791", "distance": 1.3501}, {"source": "148f6d22aa1b", "target": "2c3dda889f3e", "distance": 0.8435}, {"source": "148f6d22aa1b", "target": "dfdbc6c97791", "distance": 1.4064}, {"source": "cfe7a53646d3", "target": "dfdbc6c97791", "distance": 1.4182}, {"source": "76e1024ac206", "target": "dfdbc6c97791", "distance": 1.5158}, {"source": "d538ea53417d", "target": "c9662434ae71", "distance": 1.0339}, {"source": "07322e5ce4dd", "target": "53b6ef225203", "distance": 1.0449}, {"source": "1626968a3ba5", "target": "76e1024ac206", "distance": 1.445}, {"source": "1626968a3ba5", "target": "09fbd99dd4ba", "distance": 1.9925}, {"source": "1626968a3ba5", "target": "cfe7a53646d3", "distance": 1.3995}, {"source": "1626968a3ba5", "target": "c6c278f11fcb", "distance": 1.3862}, {"source": "1626968a3ba5", "target": "07322e5ce4dd", "distance": 1.4365}];
+        const domainColors = {"auth": "#ef4444", "db": "#3b82f6", "api": "#22c55e", "ui": "#a78bfa", "util": "#71717a"};
+
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const tooltip = document.getElementById('tooltip');
+
+        let width, height;
+        let nodes = [];
+        let links = [];
+        let showLabels = true;
+
+        // Camera state
+        let offsetX = 0, offsetY = 0;
+        let scale = 1;
+        let isDragging = false;
+        let dragStart = {x: 0, y: 0};
+
+        function resize() {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+        }
+
+        function init() {
+            resize();
+
+            // Initialize node positions with force-directed placement
+            nodes = nodesData.map((n, i) => ({
+                ...n,
+                x: width / 2 + (Math.random() - 0.5) * 400,
+                y: height / 2 + (Math.random() - 0.5) * 400,
+                vx: 0,
+                vy: 0,
+                radius: Math.max(10, Math.sqrt(n.lines) * 0.5 + n.importance * 20),
+            }));
+
+            links = linksData.map(l => ({
+                ...l,
+                sourceNode: nodes.find(n => n.id === l.source),
+                targetNode: nodes.find(n => n.id === l.target),
+            })).filter(l => l.sourceNode && l.targetNode);
+
+            // Render stats
+            document.getElementById('stats').innerHTML = `
+                <div class="stat">Modules: <span class="stat-value">${nodes.length}</span></div>
+                <div class="stat">Dependencies: <span class="stat-value">${links.length}</span></div>
+                <div class="stat">Hubs: <span class="stat-value">${nodes.filter(n => n.hub > 0.5).length}</span></div>
+                <div class="stat">Authorities: <span class="stat-value">${nodes.filter(n => n.authority > 0.5).length}</span></div>
+            `;
+
+            simulate();
+        }
+
+        function simulate() {
+            // Simple force-directed simulation
+            const iterations = 100;
+
+            for (let iter = 0; iter < iterations; iter++) {
+                // Repulsion between all nodes
+                for (let i = 0; i < nodes.length; i++) {
+                    for (let j = i + 1; j < nodes.length; j++) {
+                        const dx = nodes[j].x - nodes[i].x;
+                        const dy = nodes[j].y - nodes[i].y;
+                        const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+                        const force = 5000 / (dist * dist);
+
+                        const fx = (dx / dist) * force;
+                        const fy = (dy / dist) * force;
+
+                        nodes[i].vx -= fx;
+                        nodes[i].vy -= fy;
+                        nodes[j].vx += fx;
+                        nodes[j].vy += fy;
+                    }
+                }
+
+                // Attraction along links
+                for (const link of links) {
+                    const dx = link.targetNode.x - link.sourceNode.x;
+                    const dy = link.targetNode.y - link.sourceNode.y;
+                    const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+                    const force = (dist - 100) * 0.05;
+
+                    const fx = (dx / dist) * force;
+                    const fy = (dy / dist) * force;
+
+                    link.sourceNode.vx += fx;
+                    link.sourceNode.vy += fy;
+                    link.targetNode.vx -= fx;
+                    link.targetNode.vy -= fy;
+                }
+
+                // Center gravity
+                for (const node of nodes) {
+                    node.vx += (width / 2 - node.x) * 0.001;
+                    node.vy += (height / 2 - node.y) * 0.001;
+                }
+
+                // Apply velocities with damping
+                for (const node of nodes) {
+                    node.x += node.vx * 0.5;
+                    node.y += node.vy * 0.5;
+                    node.vx *= 0.8;
+                    node.vy *= 0.8;
+                }
+            }
+
+            draw();
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, width, height);
+
+            ctx.save();
+            ctx.translate(offsetX, offsetY);
+            ctx.scale(scale, scale);
+
+            // Draw links
+            ctx.lineWidth = 1 / scale;
+            for (const link of links) {
+                const opacity = Math.max(0.1, 1 - link.distance);
+                ctx.strokeStyle = `rgba(167, 139, 250, ${opacity * 0.5})`;
+                ctx.beginPath();
+                ctx.moveTo(link.sourceNode.x, link.sourceNode.y);
+                ctx.lineTo(link.targetNode.x, link.targetNode.y);
+                ctx.stroke();
+
+                // Arrow head
+                const angle = Math.atan2(
+                    link.targetNode.y - link.sourceNode.y,
+                    link.targetNode.x - link.sourceNode.x
+                );
+                const arrowX = link.targetNode.x - Math.cos(angle) * link.targetNode.radius;
+                const arrowY = link.targetNode.y - Math.sin(angle) * link.targetNode.radius;
+
+                ctx.fillStyle = `rgba(167, 139, 250, ${opacity * 0.5})`;
+                ctx.beginPath();
+                ctx.moveTo(arrowX, arrowY);
+                ctx.lineTo(
+                    arrowX - 8 * Math.cos(angle - 0.3),
+                    arrowY - 8 * Math.sin(angle - 0.3)
+                );
+                ctx.lineTo(
+                    arrowX - 8 * Math.cos(angle + 0.3),
+                    arrowY - 8 * Math.sin(angle + 0.3)
+                );
+                ctx.closePath();
+                ctx.fill();
+            }
+
+            // Draw nodes
+            for (const node of nodes) {
+                const color = domainColors[node.domain] || '#71717a';
+
+                // Glow for important nodes
+                if (node.importance > 0.5) {
+                    ctx.shadowColor = color;
+                    ctx.shadowBlur = 20;
+                }
+
+                ctx.fillStyle = color;
+                ctx.beginPath();
+                ctx.arc(node.x, node.y, node.radius, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.shadowBlur = 0;
+
+                // Label
+                if (showLabels && scale > 0.5) {
+                    ctx.fillStyle = '#e4e4e7';
+                    ctx.font = `${10 / scale}px sans-serif`;
+                    ctx.textAlign = 'center';
+                    ctx.fillText(node.name, node.x, node.y + node.radius + 12 / scale);
+                }
+            }
+
+            ctx.restore();
+
+            requestAnimationFrame(draw);
+        }
+
+        // Mouse interactions
+        canvas.addEventListener('mousedown', (e) => {
+            isDragging = true;
+            dragStart = {x: e.clientX - offsetX, y: e.clientY - offsetY};
+        });
+
+        canvas.addEventListener('mousemove', (e) => {
+            if (isDragging) {
+                offsetX = e.clientX - dragStart.x;
+                offsetY = e.clientY - dragStart.y;
+            } else {
+                // Tooltip
+                const mx = (e.clientX - offsetX) / scale;
+                const my = (e.clientY - offsetY) / scale;
+
+                let found = null;
+                for (const node of nodes) {
+                    const dx = mx - node.x;
+                    const dy = my - node.y;
+                    if (dx * dx + dy * dy < node.radius * node.radius) {
+                        found = node;
+                        break;
+                    }
+                }
+
+                if (found) {
+                    tooltip.innerHTML = `
+                        <h4>${found.name}</h4>
+                        <p>Domain: ${found.domain}</p>
+                        <p>Lines: ${found.lines}</p>
+                        <p>Hub: ${(found.hub * 100).toFixed(1)}%</p>
+                        <p>Authority: ${(found.authority * 100).toFixed(1)}%</p>
+                        <p>In: ${found.in_deg} | Out: ${found.out_deg}</p>
+                    `;
+                    tooltip.style.display = 'block';
+                    tooltip.style.left = (e.clientX + 15) + 'px';
+                    tooltip.style.top = (e.clientY + 15) + 'px';
+                } else {
+                    tooltip.style.display = 'none';
+                }
+            }
+        });
+
+        canvas.addEventListener('mouseup', () => {
+            isDragging = false;
+        });
+
+        canvas.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const zoom = e.deltaY > 0 ? 0.9 : 1.1;
+            scale *= zoom;
+            scale = Math.max(0.1, Math.min(5, scale));
+        });
+
+        // Controls
+        document.getElementById('resetBtn').addEventListener('click', () => {
+            offsetX = 0;
+            offsetY = 0;
+            scale = 1;
+        });
+
+        document.getElementById('toggleLabels').addEventListener('click', () => {
+            showLabels = !showLabels;
+        });
+
+        window.addEventListener('resize', resize);
+
+        init();
+    </script>
+</body>
+</html>
