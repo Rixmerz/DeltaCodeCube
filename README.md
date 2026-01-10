@@ -401,3 +401,97 @@ MIT
 - Automatic segmentation by chapters and sections
 - TF-IDF search implementation
 - SQLite storage with WAL mode
+
+---
+
+## Future Roadmap
+
+### Planned Migration to Python + uvx
+
+We are planning to migrate BigContext MCP to Python with `uvx` distribution for significantly improved developer experience.
+
+#### Why Python + uvx?
+
+**Current limitation (TypeScript/Node.js):**
+```bash
+# Users must clone repository locally
+git clone https://github.com/Rixmerz/bigcontext_mcp.git
+cd bigcontext_mcp
+npm install
+npm run build
+
+# Then configure in Claude Desktop
+{
+  "mcpServers": {
+    "bigcontext": {
+      "command": "node",
+      "args": ["/absolute/path/to/bigcontext-mcp/dist/index.js"]
+    }
+  }
+}
+```
+
+**Planned improvement (Python + uvx):**
+```bash
+# NO need to clone repository!
+# Direct installation via uvx
+uvx bigcontext-mcp
+
+# Auto-configured in Claude Desktop
+{
+  "mcpServers": {
+    "bigcontext": {
+      "command": "uvx",
+      "args": ["bigcontext-mcp"]
+    }
+  }
+}
+```
+
+#### Benefits of uvx Distribution
+
+1. **Zero local cloning** - Install directly from PyPI
+2. **Automatic dependency management** - uvx handles Python environment
+3. **Cross-platform** - Works on macOS, Linux, Windows
+4. **Version management** - Easy updates via `uvx bigcontext-mcp@latest`
+5. **Simplified configuration** - No absolute paths needed
+
+#### Migration Plan
+
+- [ ] Port TypeScript codebase to Python
+- [ ] Maintain API compatibility (same 27 tools)
+- [ ] Package for PyPI distribution
+- [ ] Test uvx installation workflow
+- [ ] Update documentation
+- [ ] Deprecate Node.js version after Python stability
+
+#### Technical Stack (Python)
+
+- **FastMCP** - MCP server framework
+- **SQLite** - Same database (compatible)
+- **PyPDF2** - PDF parsing
+- **beautifulsoup4** - HTML parsing
+- **ebooklib** - EPUB support
+- **scikit-learn** - TF-IDF (or custom implementation)
+
+#### Timeline
+
+Target: Q2 2026
+
+**Contributions welcome!** If you're interested in helping with the Python migration, please open an issue or PR.
+
+---
+
+## Contributing
+
+We welcome contributions! Areas of interest:
+- Python migration to uvx
+- Additional domain vocabularies (legal, academic, literary)
+- New extraction validators
+- Performance optimizations
+- Documentation improvements
+
+## Support
+
+- **Issues**: https://github.com/Rixmerz/bigcontext_mcp/issues
+- **Discussions**: https://github.com/Rixmerz/bigcontext_mcp/discussions
