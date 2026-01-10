@@ -3,16 +3,16 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "bigcontext-mcp"
+name = "deltacodecube"
 version = "1.0.0"
-description = "MCP Server for handling large documents with intelligent segmentation and TF-IDF search"
+description = "MCP Server for multi-dimensional code indexing - represent code as points in 63D feature space for similarity search, impact analysis, and change detection"
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.10"
 authors = [
     { name = "Juan Pablo Diaz" }
 ]
-keywords = ["mcp", "llm", "documents", "tfidf", "extraction", "claude"]
+keywords = ["mcp", "code-analysis", "similarity-search", "impact-analysis", "refactoring", "claude", "ai-tools"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
@@ -20,17 +20,13 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
-    "Topic :: Text Processing :: Indexing",
+    "Topic :: Software Development :: Quality Assurance",
+    "Topic :: Software Development :: Code Generators",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
 dependencies = [
     "fastmcp>=2.0.0",
     "pydantic>=2.0.0",
-    "pdfplumber>=0.10.0",
-    "beautifulsoup4>=4.12.0",
-    "ebooklib>=0.18",
-    "nltk>=3.8.0",
-    "lxml>=5.0.0",
     "numpy>=1.24.0",
 ]
 
@@ -43,15 +39,15 @@ dev = [
 ]
 
 [project.scripts]
-bigcontext-mcp = "bigcontext_mcp.__main__:main"
+deltacodecube = "deltacodecube.__main__:main"
 
 [project.urls]
-Homepage = "https://github.com/Rixmerz/bigcontext_mcp"
-Repository = "https://github.com/Rixmerz/bigcontext_mcp"
-Issues = "https://github.com/Rixmerz/bigcontext_mcp/issues"
+Homepage = "https://github.com/Memory-Bank/DeltaCodeCube"
+Repository = "https://github.com/Memory-Bank/DeltaCodeCube"
+Issues = "https://github.com/Memory-Bank/DeltaCodeCube/issues"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/bigcontext_mcp"]
+packages = ["src/deltacodecube"]
 
 [tool.ruff]
 line-length = 100

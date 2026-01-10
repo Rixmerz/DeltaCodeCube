@@ -1,311 +1,224 @@
-# BigContext MCP
+# DeltaCodeCube
 
-MCP Server for handling large documents with intelligent segmentation and TF-IDF search. Designed to work with documents of any size without saturating the model context window.
+**Multi-dimensional code indexing for MCP** - Represent code as points in 63D feature space for similarity search, impact analysis, and change detection.
 
-## Installation
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 
-### Via uvx (Recommended)
+## What is DeltaCodeCube?
 
-No need to clone the repository! Install directly:
+DeltaCodeCube is an MCP server that indexes your codebase as points in a 63-dimensional feature space. Each file becomes a coordinate based on:
+
+- **Lexical features (50D)**: TF-IDF vocabulary fingerprint
+- **Structural features (8D)**: Functions, classes, imports, complexity
+- **Semantic features (5D)**: Domain classification (auth, db, api, ui, util)
+
+This enables powerful capabilities:
+
+| Capability | Description |
+|------------|-------------|
+| **Similarity Search** | Find files with similar patterns, vocabulary, or structure |
+| **Impact Analysis** | See which files will be affected before making changes |
+| **Change Detection** | Track how code moves through feature space over time |
+| **Tension Detection** | Identify when changes may have broken dependencies |
+
+## Quick Start
+
+### Installation
 
 ```bash
-uvx --from git+https://github.com/Rixmerz/bigcontext_mcp.git bigcontext-mcp
+# Run directly with uvx (no clone needed)
+uvx --from git+https://github.com/Memory-Bank/DeltaCodeCube.git deltacodecube
 ```
 
-### Configuration for Claude Desktop
+### Claude Desktop Configuration
 
-Add to your `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS):
+Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 
 ```json
 {
   "mcpServers": {
-    "bigcontext": {
+    "deltacodecube": {
       "command": "uvx",
       "args": [
         "--from",
-        "git+https://github.com/Rixmerz/bigcontext_mcp.git",
-        "bigcontext-mcp"
+        "git+https://github.com/Memory-Bank/DeltaCodeCube.git",
+        "deltacodecube"
       ]
     }
   }
 }
 ```
 
-Restart Claude Desktop and the 31 BigContext tools will be available.
+Restart Claude Desktop. 18 tools will be available.
 
-## Overview
+## Tools
 
-BigContext MCP allows Claude to work with extensive documents (books, manuals, research papers) by loading only relevant fragments per query, instead of the entire document. It uses automatic segmentation and TF-IDF keyword search to retrieve the most relevant content.
+### Core Indexing (7 tools)
 
-## Key Features
-
-### Document Processing
-- **Multi-format support**: txt, md, PDF, EPUB, HTML
-- **Automatic segmentation**: Detects chapters, sections, and hierarchical structure
-- **Efficient storage**: SQLite with WAL mode for concurrent access
-- **TF-IDF indexing**: Fast semantic search without external embeddings
-
-### 31 Domain-Agnostic Tools
-
-#### Core Tools (5)
 | Tool | Description |
 |------|-------------|
-| `ingest_document` | Load, segment, and index a document |
-| `search_segment` | Search for relevant segments using TF-IDF |
-| `get_metadata` | Get metadata, structure, and top terms |
-| `list_documents` | List all indexed documents |
-| `compare_segments` | Compare two segments for themes and similarity |
+| `cube_index_file` | Index a single code file |
+| `cube_index_directory` | Index all files in a directory |
+| `cube_get_position` | Get file's 63D coordinates |
+| `cube_find_similar` | Find similar files by distance |
+| `cube_search_by_domain` | Search by semantic domain |
+| `cube_get_stats` | Get cube statistics |
+| `cube_list_code_points` | List all indexed files |
 
-#### Epistemology Tools (4)
+### Contracts (2 tools)
+
 | Tool | Description |
 |------|-------------|
-| `get_source_capabilities` | Analyze what a document CAN and CANNOT support |
-| `validate_claim` | Check if a claim can be grounded in the source |
-| `get_epistemological_report` | Complete analysis before scholarly claims |
-| `check_language_operation` | Validate linguistic operations |
+| `cube_get_contracts` | Get import/dependency relationships |
+| `cube_get_contract_stats` | Contract statistics |
 
-#### Semantic Tools (4)
+### Deltas & Tensions (5 tools)
+
 | Tool | Description |
 |------|-------------|
-| `detect_semantic_frames` | Identify conceptual frameworks (causal, revelational, performative) |
-| `analyze_subdetermination` | Distinguish indeterminacy from subdetermination |
-| `detect_performatives` | Identify performative speech acts |
-| `check_anachronisms` | Detect imported post-biblical concepts |
+| `cube_reindex` | Re-index file and detect changes |
+| `cube_analyze_impact` | Analyze impact before changes |
+| `cube_get_tensions` | Get detected contract violations |
+| `cube_resolve_tension` | Mark tension as resolved/ignored |
+| `cube_get_deltas` | Get recent code movements |
 
-#### Cognitive Tools (4)
+### Advanced Search (3 tools)
+
 | Tool | Description |
 |------|-------------|
-| `audit_cognitive_operations` | Validate query and output compliance |
-| `detect_inference_violations` | Scan for unauthorized connectors |
-| `get_permitted_operations` | Get allowed operations per text type |
-| `generate_safe_fallback` | Generate compliant response when violations detected |
+| `cube_compare` | Compare two files in detail |
+| `cube_export_positions` | Export for visualization |
+| `cube_find_by_criteria` | Multi-criteria search |
 
-#### Extraction Validators (14)
+### Suggestions (1 tool)
+
 | Tool | Description |
 |------|-------------|
-| `validate_literal_quote` | Verify quoted text exists EXACTLY in source |
-| `validate_proximity` | Check if segments are adjacent |
-| `get_adjacent_segments` | Get segments within proximity constraint |
-| `identify_speaker` | Detect who is speaking in a segment |
-| `detect_pattern_contamination` | Detect pattern completion not in source |
-| `validate_extraction_schema` | Validate pure data extraction |
-| `detect_narrative_voice` | Distinguish voice types in text |
-| `validate_agency_execution` | Distinguish EXECUTED vs REFERENCED actions |
-| `detect_text_genre` | Identify genre based on structure |
-| `detect_divine_agency_without_speech` | Find actions without speech verbs |
-| `detect_weak_quantifiers` | Detect unsupported generalizations |
-| `validate_existential_response` | Validate YES/NO question responses |
-| `build_document_vocabulary` | Create closed vocabulary from document |
-| `validate_output_vocabulary` | Check if output uses only source vocabulary |
-
-## Domain-Agnostic Architecture
-
-All extraction validators accept an optional `DomainVocabulary` parameter:
-
-```python
-class DomainVocabulary(BaseModel):
-    agents: list[str] | None = None        # ['God', 'Lord'] or ['the Court']
-    addressees: list[str] | None = None    # ['Lord'] or ['Your Honor']
-    oracle_formulas: list[str] | None = None    # ['thus says the Lord']
-    praise_formulas: list[str] | None = None    # ['praise the Lord']
-    action_verbs: list[str] | None = None       # ['led', 'brought', 'created']
-    narration_verbs: list[str] | None = None    # ['said', 'spoke', 'did']
-    state_verbs: list[str] | None = None        # ['is', 'was', 'has been']
-```
-
-### Example: Biblical Text
-```json
-{
-  "agents": ["God", "Lord", "Moses"],
-  "addressees": ["Lord", "God"],
-  "action_verbs": ["led", "brought", "gave", "made", "created"],
-  "narration_verbs": ["said", "spoke", "did", "made", "saw"],
-  "oracle_formulas": ["thus says the Lord"],
-  "praise_formulas": ["praise the Lord"]
-}
-```
-
-### Example: Legal Documents
-```json
-{
-  "agents": ["the Court", "Plaintiff", "Defendant"],
-  "addressees": ["Your Honor"],
-  "action_verbs": ["ruled", "ordered", "granted", "denied"],
-  "narration_verbs": ["stated", "found", "held", "declared"],
-  "oracle_formulas": ["the Court finds"],
-  "praise_formulas": []
-}
-```
+| `cube_suggest_fix` | Generate fix context for tensions |
 
 ## Usage Examples
 
-### 1. Ingest a document
-```python
-result = ingest_document(
-    path="/path/to/document.pdf",
-    title="My Document",
-    chunk_size=2000,
-    overlap=100
-)
-# Returns: document_id, total_segments, structure
+### Index a project
+
+```
+> Index my project at /path/to/myproject
+
+Indexed 45 files:
+- api: 18 files
+- db: 12 files
+- auth: 8 files
+- util: 7 files
 ```
 
-### 2. Search for content
-```python
-results = search_segment(
-    query="agency without speech",
-    document_id=1,
-    limit=5
-)
-# Returns: matched segments with scores and snippets
+### Find similar files
+
+```
+> Find files similar to /path/to/auth/login.js
+
+Similar files:
+1. auth/register.js (similarity: 92%)
+2. auth/reset-password.js (similarity: 87%)
+3. api/users.js (similarity: 71%)
 ```
 
-### 3. Validate narrative voice
-```python
-voice = detect_narrative_voice(
-    segment_id=722,
-    domain_vocabulary={
-        "agents": ["God", "Lord"],
-        "addressees": ["Lord", "God"],
-        "action_verbs": ["led", "brought", "gave", "made"]
-    }
-)
-# Returns: voice_type, confidence, evidence, is_retrospective
+### Analyze impact before refactoring
+
+```
+> What files will be affected if I change database.js?
+
+Impact Analysis for database.js:
+7 files depend on this module:
+- settings.js (distance: 1.52)
+- history.js (distance: 1.42)
+- scheduler.js (distance: 1.41)
+- autoresponder.js (distance: 1.35)
+...
 ```
 
-### 4. Validate agency execution
-```python
-validation = validate_agency_execution(
-    segment_id=762,
-    divine_agent_patterns=["God", "Lord"]
-)
-# Returns: is_executed, mode, agent, action, evidence
+### Detect tensions after changes
+
+```
+> I modified auth.js, check for issues
+
+Reindex result:
+- Delta detected: lexical change (52%), structural change (33%)
+- 1 tension detected with api/routes.js (15% deviation)
+
+Suggested action: Review api/routes.js - auth.js had terminology changes
 ```
 
-### 5. Detect text genre
-```python
-genre = detect_text_genre(
-    segment_id=1075,
-    domain_vocabulary={
-        "agents": ["God", "He"],
-        "oracle_formulas": ["thus says the Lord"],
-        "praise_formulas": ["praise the Lord"]
-    }
-)
-# Returns: genre, confidence, indicators
+## How It Works
+
+### The 63D Feature Space
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                    63D Feature Space                     │
+├──────────────────┬──────────────────┬───────────────────┤
+│  Lexical (50D)   │ Structural (8D)  │  Semantic (5D)    │
+├──────────────────┼──────────────────┼───────────────────┤
+│ TF-IDF vectors   │ function_count   │ auth_score        │
+│ of top 50 terms  │ class_count      │ db_score          │
+│ in vocabulary    │ import_count     │ api_score         │
+│                  │ export_count     │ ui_score          │
+│                  │ complexity       │ util_score        │
+│                  │ nesting_depth    │                   │
+│                  │ comment_ratio    │                   │
+│                  │ line_count       │                   │
+└──────────────────┴──────────────────┴───────────────────┘
 ```
 
-## Technical Stack
+### Contracts
 
-- **Python 3.11+** - Modern Python with type hints
-- **FastMCP 2.x** - MCP server framework with decorator-based tools
-- **Pydantic 2.x** - Schema validation
-- **SQLite** - Local storage with WAL mode
-- **pdfplumber** - PDF text extraction
-- **ebooklib** - EPUB support
-- **beautifulsoup4** - HTML parsing
-- **NLTK** - NLP tokenization
+When indexing, DeltaCodeCube detects import relationships and records the "baseline distance" between files in feature space. This represents the healthy distance when code is working.
+
+### Deltas
+
+When you re-index a file after changes, a Delta is created recording:
+- Movement magnitude (how far the file moved)
+- Which axis changed most (lexical, structural, semantic)
+- Whether the change is significant
+
+### Tensions
+
+When a file changes, its distance to dependent files is recalculated. If the distance deviates >15% from baseline, a Tension is created - indicating the change may have broken something.
+
+## Technical Details
+
+- **Languages supported**: JavaScript, TypeScript, Python, Go, Java
+- **Storage**: SQLite with WAL mode
+- **Framework**: FastMCP 2.x
+- **Python**: 3.10+
 
 ## Development
 
-### Local Installation
-
 ```bash
-# Clone repository
-git clone https://github.com/Rixmerz/bigcontext_mcp.git
-cd bigcontext_mcp
+# Clone
+git clone https://github.com/Memory-Bank/DeltaCodeCube.git
+cd DeltaCodeCube
 
-# Create virtual environment
-uv venv .venv
-source .venv/bin/activate
-
-# Install in development mode
+# Install
+uv venv .venv && source .venv/bin/activate
 uv pip install -e .
 
-# Run server
-python -m bigcontext_mcp
+# Run
+python -m deltacodecube
 ```
-
-### Local Testing with Claude Desktop
-
-```json
-{
-  "mcpServers": {
-    "bigcontext": {
-      "command": "uv",
-      "args": [
-        "run",
-        "--directory",
-        "/path/to/bigcontext-mcp",
-        "bigcontext-mcp"
-      ]
-    }
-  }
-}
-```
-
-## Architecture Highlights
-
-### Structural Pattern Matching
-- **Pure structural patterns** detect grammatical structure without vocabulary
-- **Dynamic pattern generation** combines structure + agent-provided vocabulary
-- **Fallback mechanisms** work with generic patterns when no vocabulary provided
-
-### No Hardcoded Assumptions
-- **Zero biblical terms hardcoded** in validation logic
-- **Zero legal terms hardcoded**
-- **Zero religious assumptions**
-- Agent provides ALL domain-specific vocabulary at runtime
-
-### Separation of Concerns
-- **SPEECH_VERB_WHITELIST**: 38 speech verbs (said, spoke, called, etc.)
-- **CAUSAL_ACTION_VERBS**: 90+ action verbs (caused, drove, made, etc.)
-- **STRUCTURAL_NARRATIVE_VOICE_PATTERNS**: Grammar-only patterns
-- **DomainVocabulary**: Agent-provided dynamic vocabulary
-
-## Changelog
-
-### V16: Python Migration (2026-01-10)
-
-**Complete rewrite from TypeScript to Python:**
-- Framework: FastMCP 2.x with decorator-based tool registration
-- Distribution: uvx-ready (zero-clone install from GitHub)
-- Database: SQLite with WAL mode (same schema, compatible)
-- Validation: Pydantic replacing Zod
-- Total: 31 MCP tools migrated and tested
-
-### V15: Domain-Agnostic Extraction Validators
-
-- Expanded DomainVocabulary interface with 7 dynamic properties
-- Refactored all validators to accept optional vocabulary parameter
-- Zero hardcoded domain-specific terms
-
-### V14: Speech vs Action Verb Separation
-
-- Created SPEECH_VERB_WHITELIST (38 speech verbs)
-- Created CAUSAL_ACTION_VERBS (90+ action verbs)
-
-### V1-V13: Core Infrastructure
-
-- Multi-format document ingestion (txt, md, PDF, EPUB, HTML)
-- Automatic segmentation by chapters and sections
-- TF-IDF search implementation
-- SQLite storage with WAL mode
-- 27 extraction validation tools
 
 ## License
 
-MIT
+MIT - Free for commercial and personal use.
 
 ## Contributing
 
-We welcome contributions! Areas of interest:
-- Additional domain vocabularies (legal, academic, literary)
-- New extraction validators
+Contributions welcome! Areas of interest:
+- Additional language support
+- Visualization tools
 - Performance optimizations
-- Documentation improvements
+- Documentation
 
-## Support
+## Links
 
-- **Issues**: https://github.com/Rixmerz/bigcontext_mcp/issues
-- **Repository**: https://github.com/Rixmerz/bigcontext_mcp
+- **Repository**: https://github.com/Memory-Bank/DeltaCodeCube
+- **Issues**: https://github.com/Memory-Bank/DeltaCodeCube/issues
