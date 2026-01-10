@@ -17,6 +17,7 @@ from typing import Any
 import numpy as np
 
 from bigcontext_mcp.cube.code_point import CodePoint, create_code_point
+from bigcontext_mcp.cube.contracts import Contract, ContractDetector
 from bigcontext_mcp.cube.features.semantic import get_dominant_domain
 from bigcontext_mcp.utils.logger import get_logger
 
@@ -48,6 +49,7 @@ class DeltaCodeCube:
         """
         self.conn = conn
         self._ensure_tables()
+        self.contract_detector = ContractDetector(conn)
 
     def _ensure_tables(self) -> None:
         """Ensure cube tables exist in database."""
@@ -135,6 +137,12 @@ class DeltaCodeCube:
                     logger.warning(f"Failed to index {file_path}: {e}")
 
         logger.info(f"Indexed {len(code_points)} files from {dir_path}")
+
+        # Detect contracts between indexed files
+        if code_points:
+            contracts = self._detect_and_save_contracts(code_points)
+            logger.info(f"Detected {len(contracts)} contracts")
+
         return code_points
 
     def _should_skip(self, file_path: Path) -> bool:
@@ -335,6 +343,78 @@ class DeltaCodeCube:
         )
 
         return [dict(row) for row in cursor.fetchall()]
+
+    # =========================================================================
+    # Contract operations
+    # =========================================================================
+
+    def _detect_and_save_contracts(self, code_points: list[CodePoint]) -> list[Contract]:
+        """
+        Detect contracts between indexed files and save to database.
+
+        Args:
+            code_points: List of indexed CodePoints.
+
+        Returns:
+            List of detected Contracts.
+        """
+        # Build lookup dictionaries
+        indexed_files = {cp.file_path: cp.id for cp in code_points}
+        code_points_dict = {cp.id: cp for cp in code_points}
+
+        # Detect contracts
+        contracts = self.contract_detector.detect_all_contracts(
+            indexed_files=indexed_files,
+            code_points=code_points_dict,
+        )
+
+        # Save to database
+        self.contract_detector.save_contracts(contracts)
+
+        return contracts
+
+    def get_contracts(
+        self,
+        file_path: str | None = None,
+        direction: str = "both",
+        limit: int = 100,
+    ) -> list[dict[str, Any]]:
+        """
+        Get contracts, optionally filtered by file.
+
+        Args:
+            file_path: If provided, get contracts for this file.
+            direction: 'incoming', 'outgoing', or 'both'.
+            limit: Maximum results.
+
+        Returns:
+            List of contract dictionaries.
+        """
+        if file_path:
+            path = str(Path(file_path).resolve())
+            contracts = self.contract_detector.get_contracts_for_file(path, direction)
+        else:
+            contracts = self.contract_detector.get_all_contracts(limit)
+
+        return [
+            {
+                "id": c.id,
+                "caller_id": c.caller_id,
+                "callee_id": c.callee_id,
+                "caller_path": c.caller_path,
+                "callee_path": c.callee_path,
+                "caller_name": Path(c.caller_path).name,
+                "callee_name": Path(c.callee_path).name,
+                "contract_type": c.contract_type,
+                "baseline_distance": c.baseline_distance,
+                "created_at": c.created_at.isoformat(),
+            }
+            for c in contracts
+        ]
+
+    def get_contract_stats(self) -> dict[str, Any]:
+        """Get statistics about contracts."""
+        return self.contract_detector.get_contract_stats()
 
     # =========================================================================
     # Database operations

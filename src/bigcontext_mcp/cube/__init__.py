@@ -6,9 +6,12 @@ para búsqueda multidimensional y detección de impacto de cambios.
 """
 
 from bigcontext_mcp.cube.code_point import CodePoint
+from bigcontext_mcp.cube.contracts import Contract, ContractDetector
 from bigcontext_mcp.cube.cube import DeltaCodeCube
 
 __all__ = [
     "CodePoint",
+    "Contract",
+    "ContractDetector",
     "DeltaCodeCube",
 ]
