@@ -9,7 +9,7 @@ from typing import Any
 from fastmcp import FastMCP
 
 from deltacodecube.db.database import get_connection
-from deltacodecube.cube import DeltaCodeCube
+from deltacodecube.cube import DeltaCodeCube, TensionDetector
 
 # Create FastMCP server
 mcp = FastMCP("deltacodecube")
