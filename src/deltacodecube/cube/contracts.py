@@ -197,7 +197,7 @@ def resolve_import_path(
     Resolve an import path to an absolute file path.
 
     Args:
-        import_path: The import path (e.g., './utils', '../services/auth').
+        import_path: The import path (e.g., './utils', '../services/auth', 'mypackage.module').
         from_file: The file containing the import (absolute path).
         indexed_files: Dict of {absolute_path: code_point_id} for all indexed files.
 
@@ -205,11 +205,30 @@ def resolve_import_path(
         Resolved absolute path if found in indexed files, None otherwise.
     """
     from_dir = Path(from_file).parent
+    from_ext = Path(from_file).suffix.lower()
 
-    # Skip external packages (not relative paths)
+    # Handle Python dotted imports (e.g., 'deltacodecube.cube.code_point')
+    if from_ext == ".py" and "." in import_path and not import_path.startswith("."):
+        # Convert dots to path separators
+        module_path = import_path.replace(".", "/")
+
+        # Search in indexed files for matching Python module
+        for indexed_path in indexed_files:
+            if indexed_path.endswith(".py"):
+                # Check if the indexed path ends with our module path
+                # e.g., '/path/to/deltacodecube/cube/code_point.py' matches 'deltacodecube.cube.code_point'
+                normalized = indexed_path.replace("\\", "/")
+                if normalized.endswith(f"{module_path}.py"):
+                    return indexed_path
+                # Also check for __init__.py in package
+                if normalized.endswith(f"{module_path}/__init__.py"):
+                    return indexed_path
+
+        return None
+
+    # Skip external packages (not relative paths) for non-Python
     if not import_path.startswith(".") and not import_path.startswith("/"):
         # Could be a package like 'express', 'react', etc.
-        # Or a Python module like 'os', 'json', etc.
         return None
 
     # Try to resolve relative path
@@ -232,6 +251,7 @@ def resolve_import_path(
         "/index.ts",
         "/index.jsx",
         "/index.tsx",
+        "/__init__.py",
     ]
 
     for ext in extensions_to_try:
