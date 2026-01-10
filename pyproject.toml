@@ -1,0 +1,64 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "bigcontext-mcp"
+version = "1.0.0"
+description = "MCP Server for handling large documents with intelligent segmentation and TF-IDF search"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.10"
+authors = [
+    { name = "Juan Pablo Diaz" }
+]
+keywords = ["mcp", "llm", "documents", "tfidf", "extraction", "claude"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Text Processing :: Indexing",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+    "fastmcp>=2.0.0",
+    "pydantic>=2.0.0",
+    "pdfplumber>=0.10.0",
+    "beautifulsoup4>=4.12.0",
+    "ebooklib>=0.18",
+    "nltk>=3.8.0",
+    "lxml>=5.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0",
+    "ruff>=0.1.0",
+    "mypy>=1.0.0",
+]
+
+[project.scripts]
+bigcontext-mcp = "bigcontext_mcp.__main__:main"
+
+[project.urls]
+Homepage = "https://github.com/Rixmerz/bigcontext_mcp"
+Repository = "https://github.com/Rixmerz/bigcontext_mcp"
+Issues = "https://github.com/Rixmerz/bigcontext_mcp/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/bigcontext_mcp"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W"]
+
+[tool.mypy]
+python_version = "3.10"
+strict = true
