@@ -22,6 +22,8 @@ This enables powerful capabilities:
 | **Impact Analysis** | See which files will be affected before making changes |
 | **Change Detection** | Track how code moves through feature space over time |
 | **Tension Detection** | Identify when changes may have broken dependencies |
+| **Code Quality** | Detect smells, clones, technical debt, and drift |
+| **Visualizations** | Interactive HTML visualizations of your codebase |
 
 ## Quick Start
 
@@ -70,7 +72,7 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS)
 }
 ```
 
-Restart Claude Code/Desktop. 27 tools will be available.
+Restart Claude Code/Desktop. **35 tools** will be available.
 
 ## Tools
 
@@ -110,17 +112,26 @@ Restart Claude Code/Desktop. 27 tools will be available.
 | `cube_analyze_graph` | Compute PageRank, HITS, betweenness centrality |
 | `cube_get_centrality` | Get centrality metrics for a specific file |
 
-### Intelligence (5 tools)
+### Code Quality (7 tools)
 
 | Tool | Description |
 |------|-------------|
-| `cube_detect_smells` | Detect code smells (god files, circular deps, etc.) |
-| `cube_cluster_files` | Automatically cluster similar files |
+| `cube_detect_smells` | Detect code smells (god files, circular deps, hub overload, etc.) |
+| `cube_cluster_files` | Automatically cluster similar files using K-means |
 | `cube_get_suggestions` | Get prioritized refactoring suggestions |
+| `cube_detect_clones` | Detect code clones (exact, parameterized, near-miss) |
+| `cube_get_debt` | Calculate technical debt score (A-F grades) |
+| `cube_analyze_surface` | Analyze API surface and stability risk |
+| `cube_detect_drift` | Detect code drift (semantic, contract, temporal) |
+
+### Impact Prediction (2 tools)
+
+| Tool | Description |
+|------|-------------|
 | `cube_simulate_wave` | Simulate tension wave propagation |
 | `cube_predict_impact` | Predict impact of changing a file |
 
-### Visualization & Export (4 tools)
+### Search & Export (6 tools)
 
 | Tool | Description |
 |------|-------------|
@@ -128,13 +139,17 @@ Restart Claude Code/Desktop. 27 tools will be available.
 | `cube_export_positions` | Export positions for external tools |
 | `cube_export_html` | Generate interactive 3D HTML visualization |
 | `cube_find_by_criteria` | Multi-criteria search |
+| `cube_suggest_fix` | Generate fix context for tensions |
+| `cube_get_temporal` | Get git history metrics for a file |
 
-### Analysis (2 tools)
+### Visualizations (4 tools)
 
 | Tool | Description |
 |------|-------------|
-| `cube_suggest_fix` | Generate fix context for tensions |
-| `cube_get_temporal` | Get git history metrics for a file |
+| `cube_generate_timeline` | Interactive timeline of code changes |
+| `cube_generate_matrix` | Dependency matrix visualization |
+| `cube_generate_heatmap` | Code heatmap (activity, complexity, debt) |
+| `cube_generate_architecture` | Force-directed architecture diagram |
 
 ## Usage Examples
 
@@ -175,16 +190,40 @@ Impact Analysis for database.js:
 ...
 ```
 
-### Detect tensions after changes
+### Calculate technical debt
 
 ```
-> I modified auth.js, check for issues
+> What's the technical debt in my codebase?
 
-Reindex result:
-- Delta detected: lexical change (52%), structural change (33%)
-- 1 tension detected with api/routes.js (15% deviation)
+Technical Debt Analysis:
+- Codebase Score: 29.6 (Grade B)
+- Distribution: A: 15, B: 22, C: 8, D: 3, F: 1
+- Top debt files:
+  1. database.js (Score: 72, Grade D)
+  2. server.py (Score: 65, Grade D)
+```
 
-Suggested action: Review api/routes.js - auth.js had terminology changes
+### Generate visualizations
+
+```
+> Generate a dependency matrix for my project
+
+Generated: deltacodecube_matrix.html
+- 66 files
+- 164 dependencies
+- 0 bidirectional
+```
+
+### Detect code smells
+
+```
+> Check for code smells
+
+Detected 11 smells:
+- 1 Hub Overload: server.py imports 17 files
+- 10 Feature Envy: files heavily importing from single modules
+
+Suggestion: Split server.py into smaller modules
 ```
 
 ## How It Works
@@ -193,7 +232,7 @@ Suggested action: Review api/routes.js - auth.js had terminology changes
 
 ```
 Lexical (65D)              Structural (16D)           Semantic (5D+)
-─────────────              ────────────────           ──────────────
+---------------------      ----------------------     -----------------
 Unigrams (50D):            Basic (8D):                Configurable:
 - TF-IDF vectors           - loc_normalized           - auth_score
 - Top 50 vocab terms       - num_functions            - db_score
@@ -205,7 +244,7 @@ Bigrams (15D):             - num_imports              - ui_score
 - return_value             - export_count             .deltacodecube.json
 - throw_error
 - etc.                     Halstead (5D):
-                           - vocabulary               ─────────────────────
+                           - vocabulary               ---------------------
 Uses cosine similarity     - volume                   Optional: Temporal (5D)
 for distance calculation   - difficulty               - file_age
                            - effort                   - change_frequency
@@ -246,9 +285,68 @@ When you re-index a file after changes, a Delta is created recording:
 
 When a file changes, its distance to dependent files is recalculated. DeltaCodeCube uses **adaptive thresholds** that learn from each file's change history:
 
-- Files with stable history → lower threshold (more sensitive)
-- Files with volatile history → higher threshold (fewer false positives)
+- Files with stable history -> lower threshold (more sensitive)
+- Files with volatile history -> higher threshold (fewer false positives)
 - Falls back to 15% default if insufficient history
+
+### Technical Debt Calculation
+
+Technical debt is calculated from 8 factors (0-100 score):
+- **Complexity**: Cyclomatic + Halstead complexity
+- **Size**: Files that are too large
+- **Coupling**: Too many dependencies
+- **Duplication**: Code clones detected
+- **Staleness**: Old unchanged code
+- **Documentation**: Low comment ratio
+- **Smells**: Code smells detected
+- **Tensions**: Unresolved tensions
+
+Grades: A (0-20), B (21-40), C (41-60), D (61-80), F (81-100)
+
+## Architecture
+
+```
+src/deltacodecube/
+├── server.py              # MCP server entry point (thin wrapper)
+├── tools/                 # MCP tool definitions (modular)
+│   ├── core.py            # Core indexing tools
+│   ├── contracts.py       # Contract tools
+│   ├── deltas.py          # Delta and tension tools
+│   ├── search.py          # Search and export tools
+│   ├── analysis.py        # Analysis tools (smells, debt, etc.)
+│   └── visualizations.py  # Visualization generators
+├── cube/                  # Core logic
+│   ├── cube.py            # DeltaCodeCube main class
+│   ├── code_point.py      # CodePoint (file in 86D space)
+│   ├── contracts.py       # Contract detection
+│   ├── delta.py           # Delta tracking
+│   ├── tension.py         # Tension detection
+│   ├── features/          # Feature extractors
+│   │   ├── lexical.py     # TF-IDF features
+│   │   ├── structural.py  # Halstead/coupling metrics
+│   │   ├── semantic.py    # Domain classification
+│   │   └── temporal.py    # Git history features
+│   ├── graph.py           # Graph analysis (PageRank, HITS)
+│   ├── smells.py          # Code smell detection
+│   ├── clustering.py      # K-means clustering
+│   ├── clones.py          # Clone detection
+│   ├── debt.py            # Technical debt calculation
+│   ├── surface.py         # API surface analysis
+│   ├── drift.py           # Code drift detection
+│   ├── waves.py           # Tension wave simulation
+│   ├── advisor.py         # Refactoring suggestions
+│   └── visualizations/    # HTML generators
+│       ├── timeline.py
+│       ├── matrix.py
+│       ├── heatmap.py
+│       └── architecture.py
+├── db/                    # Database layer
+│   ├── database.py        # SQLite connection
+│   └── schema.py          # Table definitions
+└── utils/                 # Utilities
+    ├── logger.py
+    └── errors.py
+```
 
 ## Technical Details
 
@@ -257,8 +355,8 @@ When a file changes, its distance to dependent files is recalculated. DeltaCodeC
 - **Distance metric**: Cosine similarity (better for sparse TF-IDF vectors)
 - **Lexical**: TF-IDF unigrams + code pattern bigrams (async_await, try_catch, etc.)
 - **Complexity**: Halstead metrics + coupling/cohesion estimates
-- **Thresholds**: Adaptive based on file change history (mean + 2σ)
-- **Visualization**: Interactive 3D HTML export (no external dependencies)
+- **Thresholds**: Adaptive based on file change history (mean + 2 sigma)
+- **Visualization**: Interactive HTML exports (no external dependencies)
 - **Languages supported**: JavaScript, TypeScript, Python, Go, Java
 - **Storage**: SQLite with WAL mode
 - **Framework**: FastMCP 2.x
