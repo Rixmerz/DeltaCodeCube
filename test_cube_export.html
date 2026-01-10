@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DeltaCodeCube Visualization</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #1a1a2e;
+            color: #eee;
+            overflow: hidden;
+        }
+        #container {
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+        }
+        canvas {
+            display: block;
+        }
+        #info {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(0,0,0,0.7);
+            padding: 15px;
+            border-radius: 8px;
+            max-width: 300px;
+        }
+        #info h1 {
+            font-size: 18px;
+            margin-bottom: 10px;
+            color: #fff;
+        }
+        #stats {
+            font-size: 12px;
+            color: #aaa;
+        }
+        #legend {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(0,0,0,0.7);
+            padding: 15px;
+            border-radius: 8px;
+        }
+        #legend h3 {
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin: 5px 0;
+            font-size: 12px;
+        }
+        .legend-color {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        #tooltip {
+            position: absolute;
+            background: rgba(0,0,0,0.9);
+            padding: 10px 15px;
+            border-radius: 6px;
+            font-size: 12px;
+            pointer-events: none;
+            display: none;
+            z-index: 100;
+            border: 1px solid #444;
+        }
+        #tooltip .name {
+            font-weight: bold;
+            color: #fff;
+            margin-bottom: 5px;
+        }
+        #tooltip .details {
+            color: #aaa;
+        }
+        #controls {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.7);
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 12px;
+            color: #888;
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <canvas id="canvas"></canvas>
+        <div id="info">
+            <h1>DeltaCodeCube</h1>
+            <div id="stats">Loading...</div>
+        </div>
+        <div id="legend">
+            <h3>Domains</h3>
+            <div id="legend-items"></div>
+        </div>
+        <div id="tooltip">
+            <div class="name"></div>
+            <div class="details"></div>
+        </div>
+        <div id="controls">
+            Drag to rotate | Scroll to zoom | Shift+drag to pan
+        </div>
+    </div>
+    <script>
+        // Data
+        const points = [{"id": "64cdf96e1950", "name": "app.js", "path": "", "domain": "api", "x": 0.0650509724701511, "y": 0.37807059658487807, "z": 0.2, "lines": 0}, {"id": "14c6128b1669", "name": "server.js", "path": "", "domain": "api", "x": 0.0420084025208403, "y": 0.21305050119021468, "z": 0.2, "lines": 0}, {"id": "09fbd99dd4ba", "name": "delays.js", "path": "", "domain": "api", "x": 0.05184758473652127, "y": 0.1301664184209365, "z": 0.2, "lines": 0}, {"id": "1073cb143218", "name": "automation.js", "path": "", "domain": "api", "x": 0.05917146501557793, "y": 0.27492764262003777, "z": 0.2, "lines": 0}, {"id": "b9be4a2a48f5", "name": "upload.js", "path": "", "domain": "api", "x": 0.052620136055843376, "y": 0.2221786344011601, "z": 0.2, "lines": 0}, {"id": "5fc43530fc3b", "name": "api.js", "path": "", "domain": "api", "x": 0.05723925589451003, "y": 0.46440618022240043, "z": 0.2, "lines": 0}, {"id": "fd351f9c82b4", "name": "pipeline.js", "path": "", "domain": "api", "x": 0.05947997999583195, "y": 0.3316690217251166, "z": 0.2, "lines": 0}, {"id": "dfdbc6c97791", "name": "database.js", "path": "", "domain": "db", "x": 0.04863876627759686, "y": 0.13413528548020442, "z": 0.2, "lines": 0}, {"id": "7d96a8d27ed8", "name": "automation.js", "path": "", "domain": "db", "x": 0.06992131882114405, "y": 0.30334042887980006, "z": 0.2, "lines": 0}, {"id": "2c3dda889f3e", "name": "presets.js", "path": "", "domain": "db", "x": 0.06726278305522455, "y": 0.3375376543141889, "z": 0.2, "lines": 0}, {"id": "c6c278f11fcb", "name": "contactLists.js", "path": "", "domain": "api", "x": 0.052324877363712385, "y": 0.29120140823369545, "z": 0.2, "lines": 0}, {"id": "53b6ef225203", "name": "autoresponder.js", "path": "", "domain": "util", "x": 0.058844984836748486, "y": 0.22598077719084864, "z": 0.2, "lines": 0}, {"id": "189dc46566d8", "name": "contacts.js", "path": "", "domain": "db", "x": 0.059592663314994486, "y": 0.24776506415435903, "z": 0.2, "lines": 0}, {"id": "148f6d22aa1b", "name": "scheduler.js", "path": "", "domain": "api", "x": 0.06226998490772391, "y": 0.24622285121632775, "z": 0.2, "lines": 0}, {"id": "cfe7a53646d3", "name": "history.js", "path": "", "domain": "api", "x": 0.05824035181602624, "y": 0.20353941631366218, "z": 0.19999999999999998, "lines": 0}, {"id": "1e9a3ba811d9", "name": "templates.js", "path": "", "domain": "ui", "x": 0.06620127412408446, "y": 0.2241338041663958, "z": 0.19999999999999998, "lines": 0}, {"id": "76e1024ac206", "name": "settings.js", "path": "", "domain": "api", "x": 0.05573115266163192, "y": 0.2143873783356467, "z": 0.2, "lines": 0}, {"id": "c9662434ae71", "name": "neondb.js", "path": "", "domain": "db", "x": 0.06631479219152457, "y": 0.2126175901591036, "z": 0.2, "lines": 0}, {"id": "d538ea53417d", "name": "pipeline.js", "path": "", "domain": "db", "x": 0.0656870923598728, "y": 0.31234352147741196, "z": 0.2, "lines": 0}, {"id": "07322e5ce4dd", "name": "client.js", "path": "", "domain": "api", "x": 0.06905224051781232, "y": 0.1846213216290191, "z": 0.2, "lines": 0}, {"id": "1626968a3ba5", "name": "sender.js", "path": "", "domain": "util", "x": 0.0666266263037899, "y": 0.35918030971580756, "z": 0.2, "lines": 0}, {"id": "34f3e929edcb", "name": "server.py", "path": "", "domain": "api", "x": 0.04408958557479971, "y": 0.6085117882082309, "z": 0.2, "lines": 0}, {"id": "dd5ee8aac827", "name": "config.py", "path": "", "domain": "db", "x": 0.03384615384615385, "y": 0.11141018576360165, "z": 0.19999999999999998, "lines": 0}, {"id": "14f204f8cea3", "name": "__init__.py", "path": "", "domain": "auth", "x": 0.015384615384615385, "y": 0.17115197411599561, "z": 0.2, "lines": 0}, {"id": "969ba6538b25", "name": "__main__.py", "path": "", "domain": "auth", "x": 0.029074190231479013, "y": 0.13486233536640932, "z": 0.2, "lines": 0}, {"id": "d97259b4b20e", "name": "__init__.py", "path": "", "domain": "ui", "x": 0.03076923076923077, "y": 0.1678554534761586, "z": 0.2, "lines": 0}, {"id": "f97f9bccda64", "name": "html_export.py", "path": "", "domain": "api", "x": 0.045184583271167235, "y": 0.40373307801447367, "z": 0.2, "lines": 0}, {"id": "09e172fa91f3", "name": "suggestions.py", "path": "", "domain": "db", "x": 0.056476737203318625, "y": 0.5659502924561465, "z": 0.19999999999999998, "lines": 0}, {"id": "c4f8ed445e93", "name": "clustering.py", "path": "", "domain": "db", "x": 0.03598465330953308, "y": 0.6177008480653535, "z": 0.2, "lines": 0}, {"id": "79d2698f9bd3", "name": "clones.py", "path": "", "domain": "util", "x": 0.04251689407837039, "y": 0.519430472519903, "z": 0.2, "lines": 0}, {"id": "97921e2a7f1c", "name": "advisor.py", "path": "", "domain": "api", "x": 0.03633637315484246, "y": 0.5425803340830797, "z": 0.2, "lines": 0}, {"id": "41c12ecb633a", "name": "graph.py", "path": "", "domain": "db", "x": 0.04502924978379184, "y": 0.6133359078087011, "z": 0.2, "lines": 0}, {"id": "703801a4d36e", "name": "drift.py", "path": "", "domain": "db", "x": 0.04232073695151589, "y": 0.5498071101383228, "z": 0.2, "lines": 0}, {"id": "1457f75766d5", "name": "__init__.py", "path": "", "domain": "auth", "x": 0.015384615384615385, "y": 0.1586973851847996, "z": 0.2, "lines": 0}, {"id": "cd1518ef0708", "name": "smells.py", "path": "", "domain": "api", "x": 0.040100090141033405, "y": 0.6169273747905579, "z": 0.19999999999999998, "lines": 0}, {"id": "8b822f773fdf", "name": "cube.py", "path": "", "domain": "db", "x": 0.0455161841389644, "y": 0.6299075731197934, "z": 0.2, "lines": 0}, {"id": "d3e1b0f39768", "name": "delta.py", "path": "", "domain": "db", "x": 0.037360415623211275, "y": 0.4650167884933857, "z": 0.2, "lines": 0}, {"id": "835a44e753e4", "name": "contracts.py", "path": "", "domain": "db", "x": 0.04391457850217621, "y": 0.6472033656489596, "z": 0.2, "lines": 0}, {"id": "a7189b212e80", "name": "code_point.py", "path": "", "domain": "api", "x": 0.04011684284331762, "y": 0.4797719154187649, "z": 0.2, "lines": 0}, {"id": "347b857a8565", "name": "waves.py", "path": "", "domain": "util", "x": 0.04699092901561028, "y": 0.5176732602072296, "z": 0.2, "lines": 0}, {"id": "ba664065252d", "name": "debt.py", "path": "", "domain": "db", "x": 0.03535203330689218, "y": 0.5928018925341021, "z": 0.2, "lines": 0}, {"id": "53070592c348", "name": "surface.py", "path": "", "domain": "api", "x": 0.05504360825217907, "y": 0.613719756745337, "z": 0.2, "lines": 0}, {"id": "21ff822ce3a4", "name": "tension.py", "path": "", "domain": "db", "x": 0.044705520207744764, "y": 0.6390924993859265, "z": 0.2, "lines": 0}, {"id": "b204f4e4af49", "name": "structural.py", "path": "", "domain": "db", "x": 0.057100452909564996, "y": 0.5942507006401967, "z": 0.2, "lines": 0}, {"id": "fd746af0c481", "name": "temporal.py", "path": "", "domain": "util", "x": 0.04671465330966873, "y": 0.4034393934752578, "z": 0.2, "lines": 0}, {"id": "10019269137e", "name": "semantic.py", "path": "", "domain": "util", "x": 0.04589955305527818, "y": 0.37278908531448074, "z": 0.2, "lines": 0}, {"id": "8e67a05ba1e5", "name": "__init__.py", "path": "", "domain": "auth", "x": 0.018656586541256383, "y": 0.16651255720641545, "z": 0.2, "lines": 0}, {"id": "1fe186f94602", "name": "lexical.py", "path": "", "domain": "api", "x": 0.08020509659876354, "y": 0.35272505580372204, "z": 0.2, "lines": 0}, {"id": "7bd366259df2", "name": "matrix.py", "path": "", "domain": "db", "x": 0.04788325325767483, "y": 0.5092721974833905, "z": 0.2, "lines": 0}, {"id": "0d6d43e35016", "name": "heatmap.py", "path": "", "domain": "ui", "x": 0.05034100757248954, "y": 0.4952332562825308, "z": 0.2, "lines": 0}, {"id": "6b43a3a2187f", "name": "timeline.py", "path": "", "domain": "db", "x": 0.04657747913975238, "y": 0.5047809203841157, "z": 0.2, "lines": 0}, {"id": "5f01a38e6b7f", "name": "__init__.py", "path": "", "domain": "ui", "x": 0.026240088166844363, "y": 0.1799082281117944, "z": 0.2, "lines": 0}, {"id": "c94a40c290fb", "name": "architecture.py", "path": "", "domain": "ui", "x": 0.048697125514960284, "y": 0.40494093005812304, "z": 0.19999999999999998, "lines": 0}, {"id": "93255eafbaed", "name": "__init__.py", "path": "", "domain": "util", "x": 0.025641025641025647, "y": 0.16787186901811532, "z": 0.2, "lines": 0}, {"id": "9a149d18d6f5", "name": "logger.py", "path": "", "domain": "util", "x": 0.03713906763541037, "y": 0.13992479597777255, "z": 0.2, "lines": 0}, {"id": "ec38f8e6bccb", "name": "errors.py", "path": "", "domain": "util", "x": 0.03133867409525862, "y": 0.16101036992038234, "z": 0.2, "lines": 0}, {"id": "7ea1e9dcd5ff", "name": "database.py", "path": "", "domain": "db", "x": 0.043250271556288404, "y": 0.21976525207339673, "z": 0.2, "lines": 0}, {"id": "3919e87581ad", "name": "__init__.py", "path": "", "domain": "db", "x": 0.02624008816684436, "y": 0.1517776203649976, "z": 0.2, "lines": 0}, {"id": "94efb23a7c15", "name": "schema.py", "path": "", "domain": "db", "x": 0.028845121429135128, "y": 0.0872705595385797, "z": 0.2, "lines": 0}];
+        const contracts = [{"from": "3919e87581ad", "to": "94efb23a7c15", "distance": 2.071777160083363}, {"from": "3919e87581ad", "to": "7ea1e9dcd5ff", "distance": 1.535363782824152}, {"from": "7ea1e9dcd5ff", "to": "9a149d18d6f5", "distance": 1.2002092607468098}, {"from": "7ea1e9dcd5ff", "to": "94efb23a7c15", "distance": 1.8809351002935555}, {"from": "7ea1e9dcd5ff", "to": "dd5ee8aac827", "distance": 1.2485152586280481}, {"from": "9a149d18d6f5", "to": "dd5ee8aac827", "distance": 1.241170116973951}, {"from": "93255eafbaed", "to": "9a149d18d6f5", "distance": 1.3838890898340177}, {"from": "93255eafbaed", "to": "ec38f8e6bccb", "distance": 1.9861289574884868}, {"from": "c94a40c290fb", "to": "9a149d18d6f5", "distance": 2.097259144303932}, {"from": "5f01a38e6b7f", "to": "6b43a3a2187f", "distance": 2.643215782953845}, {"from": "5f01a38e6b7f", "to": "7bd366259df2", "distance": 2.6298738298815367}, {"from": "5f01a38e6b7f", "to": "0d6d43e35016", "distance": 2.547794696464795}, {"from": "5f01a38e6b7f", "to": "c94a40c290fb", "distance": 2.423039026505565}, {"from": "6b43a3a2187f", "to": "9a149d18d6f5", "distance": 2.302307803822298}, {"from": "0d6d43e35016", "to": "9a149d18d6f5", "distance": 2.2530722502009057}, {"from": "7bd366259df2", "to": "9a149d18d6f5", "distance": 2.2544569289251806}, {"from": "8e67a05ba1e5", "to": "1fe186f94602", "distance": 2.1398559619626716}, {"from": "8e67a05ba1e5", "to": "fd746af0c481", "distance": 2.225156912367175}, {"from": "8e67a05ba1e5", "to": "10019269137e", "distance": 2.1349858689717336}, {"from": "8e67a05ba1e5", "to": "b204f4e4af49", "distance": 2.8362278783479673}, {"from": "fd746af0c481", "to": "9a149d18d6f5", "distance": 1.6489347558816252}, {"from": "21ff822ce3a4", "to": "a7189b212e80", "distance": 1.080326543544135}, {"from": "21ff822ce3a4", "to": "9a149d18d6f5", "distance": 2.766515709228221}, {"from": "21ff822ce3a4", "to": "d3e1b0f39768", "distance": 1.1206947341916622}, {"from": "21ff822ce3a4", "to": "835a44e753e4", "distance": 0.8397011679103781}, {"from": "53070592c348", "to": "9a149d18d6f5", "distance": 2.540800594667478}, {"from": "ba664065252d", "to": "fd746af0c481", "distance": 1.464873415967997}, {"from": "ba664065252d", "to": "9a149d18d6f5", "distance": 2.5979998904538073}, {"from": "ba664065252d", "to": "79d2698f9bd3", "distance": 0.6506742873024128}, {"from": "ba664065252d", "to": "cd1518ef0708", "distance": 0.5751685162857332}, {"from": "347b857a8565", "to": "9a149d18d6f5", "distance": 2.3083206482993575}, {"from": "347b857a8565", "to": "41c12ecb633a", "distance": 0.7915623845538945}, {"from": "a7189b212e80", "to": "10019269137e", "distance": 1.2551206850241354}, {"from": "a7189b212e80", "to": "b204f4e4af49", "distance": 1.6144623729228766}, {"from": "a7189b212e80", "to": "1fe186f94602", "distance": 1.3039357739337805}, {"from": "a7189b212e80", "to": "8e67a05ba1e5", "distance": 2.5107714771666845}, {"from": "835a44e753e4", "to": "9a149d18d6f5", "distance": 2.7367119022731248}, {"from": "d3e1b0f39768", "to": "a7189b212e80", "distance": 1.1081140112760677}, {"from": "d3e1b0f39768", "to": "9a149d18d6f5", "distance": 2.2044095416062457}, {"from": "d3e1b0f39768", "to": "b204f4e4af49", "distance": 1.544401752487675}, {"from": "d3e1b0f39768", "to": "1fe186f94602", "distance": 1.4854910650607518}, {"from": "d3e1b0f39768", "to": "10019269137e", "distance": 1.4578278295686884}, {"from": "8b822f773fdf", "to": "09e172fa91f3", "distance": 1.2182854342444007}, {"from": "8b822f773fdf", "to": "a7189b212e80", "distance": 1.2214125368377355}, {"from": "8b822f773fdf", "to": "9a149d18d6f5", "distance": 2.7976434378980106}, {"from": "8b822f773fdf", "to": "d3e1b0f39768", "distance": 1.2135334128257071}, {"from": "8b822f773fdf", "to": "835a44e753e4", "distance": 0.9832597308554263}, {"from": "8b822f773fdf", "to": "10019269137e", "distance": 1.6830571695326237}, {"from": "8b822f773fdf", "to": "21ff822ce3a4", "distance": 0.4902702032343671}, {"from": "cd1518ef0708", "to": "fd746af0c481", "distance": 1.604838674027758}, {"from": "cd1518ef0708", "to": "9a149d18d6f5", "distance": 2.7061119392406376}, {"from": "cd1518ef0708", "to": "41c12ecb633a", "distance": 0.5511257887372548}, {"from": "1457f75766d5", "to": "09e172fa91f3", "distance": 2.7728239414167732}, {"from": "1457f75766d5", "to": "a7189b212e80", "distance": 2.493974026416161}, {"from": "1457f75766d5", "to": "8b822f773fdf", "distance": 3.141368791306891}, {"from": "1457f75766d5", "to": "d3e1b0f39768", "distance": 2.416690943386863}, {"from": "1457f75766d5", "to": "835a44e753e4", "distance": 2.930028980055358}, {"from": "1457f75766d5", "to": "21ff822ce3a4", "distance": 3.07421010340792}, {"from": "703801a4d36e", "to": "a7189b212e80", "distance": 1.05732500251998}, {"from": "703801a4d36e", "to": "9a149d18d6f5", "distance": 2.4810451702901846}, {"from": "703801a4d36e", "to": "fd746af0c481", "distance": 1.3151995791360496}, {"from": "41c12ecb633a", "to": "9a149d18d6f5", "distance": 2.719303820360132}, {"from": "97921e2a7f1c", "to": "9a149d18d6f5", "distance": 2.4341281872654346}, {"from": "97921e2a7f1c", "to": "41c12ecb633a", "distance": 0.7759939363265741}, {"from": "97921e2a7f1c", "to": "c4f8ed445e93", "distance": 0.7433181067878389}, {"from": "97921e2a7f1c", "to": "21ff822ce3a4", "distance": 0.8641093578744061}, {"from": "97921e2a7f1c", "to": "cd1518ef0708", "distance": 0.6107702128051217}, {"from": "79d2698f9bd3", "to": "9a149d18d6f5", "distance": 2.199700574702928}, {"from": "c4f8ed445e93", "to": "9a149d18d6f5", "distance": 2.779399762216555}, {"from": "09e172fa91f3", "to": "9a149d18d6f5", "distance": 2.4810008983447123}, {"from": "09e172fa91f3", "to": "d3e1b0f39768", "distance": 1.397445612248218}, {"from": "09e172fa91f3", "to": "21ff822ce3a4", "distance": 1.1205309480285541}, {"from": "d97259b4b20e", "to": "f97f9bccda64", "distance": 2.4643120050516325}, {"from": "969ba6538b25", "to": "34f3e929edcb", "distance": 2.885098221084485}, {"from": "34f3e929edcb", "to": "703801a4d36e", "distance": 1.627279715722043}, {"from": "34f3e929edcb", "to": "fd746af0c481", "distance": 1.730545482019349}, {"from": "34f3e929edcb", "to": "ba664065252d", "distance": 1.558963626439756}, {"from": "34f3e929edcb", "to": "c4f8ed445e93", "distance": 1.6064695871235741}, {"from": "34f3e929edcb", "to": "6b43a3a2187f", "distance": 1.6493392457498834}, {"from": "34f3e929edcb", "to": "1457f75766d5", "distance": 3.0893520488962585}, {"from": "34f3e929edcb", "to": "7bd366259df2", "distance": 1.588708081537341}, {"from": "34f3e929edcb", "to": "d97259b4b20e", "distance": 3.2838406947412957}, {"from": "34f3e929edcb", "to": "79d2698f9bd3", "distance": 1.6491730396462874}, {"from": "34f3e929edcb", "to": "53070592c348", "distance": 1.9489059061972336}, {"from": "34f3e929edcb", "to": "347b857a8565", "distance": 1.5326182660962036}, {"from": "34f3e929edcb", "to": "7ea1e9dcd5ff", "distance": 2.3763266967042806}, {"from": "34f3e929edcb", "to": "41c12ecb633a", "distance": 1.5511315344003258}, {"from": "34f3e929edcb", "to": "97921e2a7f1c", "distance": 1.6490500470457206}, {"from": "34f3e929edcb", "to": "0d6d43e35016", "distance": 1.6332977997964901}, {"from": "34f3e929edcb", "to": "c94a40c290fb", "distance": 2.201068548876726}, {"from": "34f3e929edcb", "to": "cd1518ef0708", "distance": 1.4545296281488005}, {"from": "1626968a3ba5", "to": "07322e5ce4dd", "distance": 1.4364749985175456}, {"from": "1626968a3ba5", "to": "c6c278f11fcb", "distance": 1.3862257225384425}, {"from": "1626968a3ba5", "to": "cfe7a53646d3", "distance": 1.3995249726557673}, {"from": "1626968a3ba5", "to": "09fbd99dd4ba", "distance": 1.9925029246287114}, {"from": "1626968a3ba5", "to": "76e1024ac206", "distance": 1.4449539638034838}, {"from": "07322e5ce4dd", "to": "53b6ef225203", "distance": 1.0448922965126488}, {"from": "d538ea53417d", "to": "c9662434ae71", "distance": 1.0338780458288053}, {"from": "76e1024ac206", "to": "dfdbc6c97791", "distance": 1.5158465785356219}, {"from": "cfe7a53646d3", "to": "dfdbc6c97791", "distance": 1.4182034283754572}, {"from": "148f6d22aa1b", "to": "dfdbc6c97791", "distance": 1.4064006129860027}, {"from": "148f6d22aa1b", "to": "2c3dda889f3e", "distance": 0.8435216550383877}, {"from": "53b6ef225203", "to": "dfdbc6c97791", "distance": 1.350090965208832}, {"from": "53b6ef225203", "to": "76e1024ac206", "distance": 1.019206880436077}, {"from": "c6c278f11fcb", "to": "dfdbc6c97791", "distance": 1.6191938277802145}, {"from": "2c3dda889f3e", "to": "dfdbc6c97791", "distance": 1.476232266022659}, {"from": "7d96a8d27ed8", "to": "d538ea53417d", "distance": 0.6180207469816772}, {"from": "7d96a8d27ed8", "to": "c9662434ae71", "distance": 0.8481924340551132}, {"from": "fd351f9c82b4", "to": "d538ea53417d", "distance": 1.1058374216416775}, {"from": "5fc43530fc3b", "to": "1626968a3ba5", "distance": 1.194690518080967}, {"from": "5fc43530fc3b", "to": "c6c278f11fcb", "distance": 1.1828445720413554}, {"from": "5fc43530fc3b", "to": "2c3dda889f3e", "distance": 1.0491523950029205}, {"from": "5fc43530fc3b", "to": "1e9a3ba811d9", "distance": 1.401015290509211}, {"from": "5fc43530fc3b", "to": "53b6ef225203", "distance": 1.2946476403287437}, {"from": "5fc43530fc3b", "to": "189dc46566d8", "distance": 1.5780418986944196}, {"from": "5fc43530fc3b", "to": "cfe7a53646d3", "distance": 1.326807712923055}, {"from": "5fc43530fc3b", "to": "76e1024ac206", "distance": 1.3844408068857978}, {"from": "5fc43530fc3b", "to": "07322e5ce4dd", "distance": 1.570115218333731}, {"from": "5fc43530fc3b", "to": "148f6d22aa1b", "distance": 1.1515065597361742}, {"from": "b9be4a2a48f5", "to": "189dc46566d8", "distance": 0.9645598734213143}, {"from": "1073cb143218", "to": "7d96a8d27ed8", "distance": 1.0597028093058936}, {"from": "14c6128b1669", "to": "07322e5ce4dd", "distance": 1.2332531546326413}, {"from": "14c6128b1669", "to": "c9662434ae71", "distance": 1.2458914337580635}, {"from": "14c6128b1669", "to": "148f6d22aa1b", "distance": 1.2256050932415807}, {"from": "14c6128b1669", "to": "1073cb143218", "distance": 1.3039809093783639}, {"from": "14c6128b1669", "to": "1e9a3ba811d9", "distance": 1.3076033459864367}, {"from": "14c6128b1669", "to": "7d96a8d27ed8", "distance": 1.553921868929096}, {"from": "14c6128b1669", "to": "b9be4a2a48f5", "distance": 0.7818405927139812}, {"from": "14c6128b1669", "to": "fd351f9c82b4", "distance": 1.3835509261177819}, {"from": "14c6128b1669", "to": "5fc43530fc3b", "distance": 1.5839419222246345}, {"from": "14c6128b1669", "to": "1626968a3ba5", "distance": 1.5401138935547927}, {"from": "14c6128b1669", "to": "dfdbc6c97791", "distance": 1.6010061915537006}];
+        const tensionPaths = new Set([]);
+        const domainColors = {"auth": "#e74c3c", "db": "#3498db", "api": "#2ecc71", "ui": "#9b59b6", "util": "#f39c12", "unknown": "#95a5a6"};
+
+        // Canvas setup
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        let width, height;
+
+        function resize() {
+            width = window.innerWidth;
+            height = window.innerHeight;
+            canvas.width = width;
+            canvas.height = height;
+        }
+        resize();
+        window.addEventListener('resize', resize);
+
+        // Camera
+        let rotationX = 0.3;
+        let rotationY = 0.5;
+        let zoom = 2;
+        let panX = 0;
+        let panY = 0;
+
+        // Find data bounds
+        let minX = Infinity, maxX = -Infinity;
+        let minY = Infinity, maxY = -Infinity;
+        let minZ = Infinity, maxZ = -Infinity;
+
+        points.forEach(p => {
+            minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x);
+            minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y);
+            minZ = Math.min(minZ, p.z); maxZ = Math.max(maxZ, p.z);
+        });
+
+        const rangeX = maxX - minX || 1;
+        const rangeY = maxY - minY || 1;
+        const rangeZ = maxZ - minZ || 1;
+        const maxRange = Math.max(rangeX, rangeY, rangeZ);
+
+        // Normalize points to [-1, 1]
+        points.forEach(p => {
+            p.nx = ((p.x - minX) / maxRange - 0.5) * 2;
+            p.ny = ((p.y - minY) / maxRange - 0.5) * 2;
+            p.nz = ((p.z - minZ) / maxRange - 0.5) * 2;
+        });
+
+        // Project 3D to 2D
+        function project(x, y, z) {
+            // Rotate around Y axis
+            const cosY = Math.cos(rotationY);
+            const sinY = Math.sin(rotationY);
+            const x1 = x * cosY - z * sinY;
+            const z1 = x * sinY + z * cosY;
+
+            // Rotate around X axis
+            const cosX = Math.cos(rotationX);
+            const sinX = Math.sin(rotationX);
+            const y1 = y * cosX - z1 * sinX;
+            const z2 = y * sinX + z1 * cosX;
+
+            // Perspective projection
+            const scale = 200 * zoom / (z2 + 3);
+            const px = x1 * scale + width / 2 + panX;
+            const py = -y1 * scale + height / 2 + panY;
+
+            return { x: px, y: py, z: z2, scale: scale };
+        }
+
+        // Mouse interaction
+        let isDragging = false;
+        let lastX, lastY;
+        let shiftKey = false;
+
+        canvas.addEventListener('mousedown', e => {
+            isDragging = true;
+            lastX = e.clientX;
+            lastY = e.clientY;
+            shiftKey = e.shiftKey;
+        });
+
+        canvas.addEventListener('mousemove', e => {
+            if (isDragging) {
+                const dx = e.clientX - lastX;
+                const dy = e.clientY - lastY;
+
+                if (shiftKey) {
+                    panX += dx;
+                    panY += dy;
+                } else {
+                    rotationY += dx * 0.01;
+                    rotationX += dy * 0.01;
+                }
+
+                lastX = e.clientX;
+                lastY = e.clientY;
+            } else {
+                // Hover detection
+                checkHover(e.clientX, e.clientY);
+            }
+        });
+
+        canvas.addEventListener('mouseup', () => isDragging = false);
+        canvas.addEventListener('mouseleave', () => isDragging = false);
+
+        canvas.addEventListener('wheel', e => {
+            e.preventDefault();
+            zoom *= e.deltaY > 0 ? 0.9 : 1.1;
+            zoom = Math.max(0.5, Math.min(10, zoom));
+        });
+
+        // Tooltip
+        const tooltip = document.getElementById('tooltip');
+        let hoveredPoint = null;
+
+        function checkHover(mx, my) {
+            hoveredPoint = null;
+            let minDist = 20;
+
+            points.forEach(p => {
+                const proj = project(p.nx, p.ny, p.nz);
+                const dist = Math.sqrt((proj.x - mx) ** 2 + (proj.y - my) ** 2);
+                if (dist < minDist) {
+                    minDist = dist;
+                    hoveredPoint = p;
+                }
+            });
+
+            if (hoveredPoint) {
+                tooltip.style.display = 'block';
+                tooltip.style.left = (mx + 15) + 'px';
+                tooltip.style.top = (my + 15) + 'px';
+                tooltip.querySelector('.name').textContent = hoveredPoint.name;
+                tooltip.querySelector('.details').innerHTML =
+                    `Domain: ${hoveredPoint.domain}<br>` +
+                    `Lines: ${hoveredPoint.lines}<br>` +
+                    `Path: ${hoveredPoint.path}`;
+            } else {
+                tooltip.style.display = 'none';
+            }
+        }
+
+        // Render
+        function render() {
+            ctx.fillStyle = '#1a1a2e';
+            ctx.fillRect(0, 0, width, height);
+
+            // Sort points by Z for depth ordering
+            const projected = points.map(p => ({
+                ...p,
+                proj: project(p.nx, p.ny, p.nz)
+            }));
+            projected.sort((a, b) => b.proj.z - a.proj.z);
+
+            // Draw contract lines
+            ctx.strokeStyle = 'rgba(100, 100, 100, 0.3)';
+            ctx.lineWidth = 1;
+            contracts.forEach(c => {
+                const from = points.find(p => p.id === c.from);
+                const to = points.find(p => p.id === c.to);
+                if (from && to) {
+                    const p1 = project(from.nx, from.ny, from.nz);
+                    const p2 = project(to.nx, to.ny, to.nz);
+                    ctx.beginPath();
+                    ctx.moveTo(p1.x, p1.y);
+                    ctx.lineTo(p2.x, p2.y);
+                    ctx.stroke();
+                }
+            });
+
+            // Draw points
+            projected.forEach(p => {
+                const { proj } = p;
+                const radius = Math.max(3, Math.min(15, proj.scale * 0.05));
+                const color = domainColors[p.domain] || domainColors.unknown;
+                const hasTension = tensionPaths.has(p.path);
+
+                // Glow for hovered or tension points
+                if (p === hoveredPoint || hasTension) {
+                    ctx.beginPath();
+                    ctx.arc(proj.x, proj.y, radius + 5, 0, Math.PI * 2);
+                    ctx.fillStyle = hasTension ? 'rgba(231, 76, 60, 0.3)' : 'rgba(255, 255, 255, 0.3)';
+                    ctx.fill();
+                }
+
+                ctx.beginPath();
+                ctx.arc(proj.x, proj.y, radius, 0, Math.PI * 2);
+                ctx.fillStyle = color;
+                ctx.fill();
+
+                // Border
+                ctx.strokeStyle = p === hoveredPoint ? '#fff' : 'rgba(255,255,255,0.3)';
+                ctx.lineWidth = p === hoveredPoint ? 2 : 1;
+                ctx.stroke();
+            });
+
+            requestAnimationFrame(render);
+        }
+
+        // Update stats
+        const domainCounts = {};
+        points.forEach(p => {
+            domainCounts[p.domain] = (domainCounts[p.domain] || 0) + 1;
+        });
+
+        document.getElementById('stats').innerHTML =
+            `${points.length} files indexed<br>` +
+            `${contracts.length} contracts detected<br>` +
+            `${tensionPaths.size} files with tensions`;
+
+        // Build legend
+        const legendItems = document.getElementById('legend-items');
+        Object.entries(domainColors).forEach(([domain, color]) => {
+            const count = domainCounts[domain] || 0;
+            if (count > 0 || domain !== 'unknown') {
+                const item = document.createElement('div');
+                item.className = 'legend-item';
+                item.innerHTML = `<div class="legend-color" style="background: ${color}"></div>${domain} (${count})`;
+                legendItems.appendChild(item);
+            }
+        });
+
+        // Start rendering
+        render();
+    </script>
+</body>
+</html>
