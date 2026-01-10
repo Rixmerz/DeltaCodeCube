@@ -10,15 +10,25 @@ from bigcontext_mcp.cube.contracts import Contract, ContractDetector
 from bigcontext_mcp.cube.cube import DeltaCodeCube
 from bigcontext_mcp.cube.delta import Delta, DeltaTracker, create_delta
 from bigcontext_mcp.cube.tension import Tension, TensionDetector
+from bigcontext_mcp.cube.suggestions import (
+    ChangeAnalysis,
+    SuggestionGenerator,
+    analyze_change_type,
+    extract_relevant_snippets,
+)
 
 __all__ = [
+    "ChangeAnalysis",
     "CodePoint",
     "Contract",
     "ContractDetector",
     "Delta",
     "DeltaCodeCube",
     "DeltaTracker",
+    "SuggestionGenerator",
     "Tension",
     "TensionDetector",
+    "analyze_change_type",
     "create_delta",
+    "extract_relevant_snippets",
 ]

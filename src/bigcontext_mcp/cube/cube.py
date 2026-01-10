@@ -21,6 +21,7 @@ from bigcontext_mcp.cube.contracts import Contract, ContractDetector
 from bigcontext_mcp.cube.delta import Delta, DeltaTracker, create_delta
 from bigcontext_mcp.cube.features.semantic import get_dominant_domain
 from bigcontext_mcp.cube.tension import Tension, TensionDetector
+from bigcontext_mcp.cube.suggestions import SuggestionGenerator
 from bigcontext_mcp.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -54,6 +55,7 @@ class DeltaCodeCube:
         self.contract_detector = ContractDetector(conn)
         self.delta_tracker = DeltaTracker(conn)
         self.tension_detector = TensionDetector(conn)
+        self.suggestion_generator = SuggestionGenerator(conn)
 
     def _ensure_tables(self) -> None:
         """Ensure cube tables exist in database."""
@@ -847,6 +849,33 @@ class DeltaCodeCube:
         """
         deltas = self.delta_tracker.get_recent_deltas(limit=limit)
         return [d.to_dict() for d in deltas]
+
+    # =========================================================================
+    # Suggestion operations
+    # =========================================================================
+
+    def get_suggestion_context(
+        self,
+        tension_id: str | None = None,
+        file_path: str | None = None,
+    ) -> dict[str, Any]:
+        """
+        Generate rich context for fix suggestions.
+
+        Provides detailed analysis and code snippets to help
+        generate intelligent fix suggestions.
+
+        Args:
+            tension_id: ID of a specific tension to analyze.
+            file_path: Path to file to analyze (uses latest delta).
+
+        Returns:
+            Rich context dictionary with analysis and snippets.
+        """
+        return self.suggestion_generator.generate_suggestion_context(
+            tension_id=tension_id,
+            file_path=file_path,
+        )
 
     # =========================================================================
     # Database operations

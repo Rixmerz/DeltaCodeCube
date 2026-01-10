@@ -1419,3 +1419,46 @@ def cube_find_by_criteria(
                 "similar_to": similar_to,
             },
         }
+
+
+# =============================================================================
+# Phase 5: Suggestion Tools
+# =============================================================================
+
+
+@mcp.tool()
+def cube_suggest_fix(
+    tension_id: str | None = None,
+    file_path: str | None = None,
+) -> dict[str, Any]:
+    """
+    Generate fix suggestion context for a tension or changed file.
+
+    Provides rich context including:
+    - Change type analysis (structural, lexical, semantic)
+    - Severity assessment
+    - Likely causes of the tension
+    - Suggested actions to fix the issue
+    - Relevant code snippets from affected files
+    - Step-by-step fix guidance
+
+    This tool generates context that helps Claude provide intelligent
+    fix suggestions based on the specific type of change detected.
+
+    Args:
+        tension_id: ID of a specific tension to analyze.
+        file_path: Path to a changed file to analyze (uses latest delta).
+
+    Returns:
+        Rich context with analysis, snippets, and fix guidance.
+
+    Examples:
+        - Analyze a tension: tension_id="abc123"
+        - Analyze a changed file: file_path="/path/to/changed.js"
+    """
+    with get_connection() as conn:
+        cube = DeltaCodeCube(conn)
+        return cube.get_suggestion_context(
+            tension_id=tension_id,
+            file_path=file_path,
+        )
