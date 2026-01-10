@@ -15,7 +15,7 @@ DEFAULT_CHUNK_SIZE = 2000  # words
 DEFAULT_OVERLAP = 100  # words
 
 # Supported formats
-SUPPORTED_FORMATS = {"txt", "md", "pdf", "epub", "html"}
+SUPPORTED_FORMATS = {"txt", "md", "pdf", "epub", "html", "code"}
 
 # Logging
 LOG_LEVEL = os.environ.get("BIGCONTEXT_LOG_LEVEL", "INFO")
