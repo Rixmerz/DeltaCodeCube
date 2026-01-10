@@ -28,12 +28,12 @@ This enables powerful capabilities:
 
 ```bash
 # Run directly with uvx (no clone needed)
-uvx --from git+https://github.com/Memory-Bank/DeltaCodeCube.git deltacodecube
+uvx --from git+https://github.com/Rixmerz/DeltaCodeCube.git deltacodecube
 ```
 
-### Claude Desktop Configuration
+### Claude Code Configuration
 
-Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
+Add to `~/.claude/settings.json`:
 
 ```json
 {
@@ -42,7 +42,7 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
       "command": "uvx",
       "args": [
         "--from",
-        "git+https://github.com/Memory-Bank/DeltaCodeCube.git",
+        "git+https://github.com/Rixmerz/DeltaCodeCube.git",
         "deltacodecube"
       ]
     }
@@ -50,7 +50,26 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 }
 ```
 
-Restart Claude Desktop. 18 tools will be available.
+### Claude Desktop Configuration
+
+Add to `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) or `%APPDATA%\Claude\claude_desktop_config.json` (Windows):
+
+```json
+{
+  "mcpServers": {
+    "deltacodecube": {
+      "command": "uvx",
+      "args": [
+        "--from",
+        "git+https://github.com/Rixmerz/DeltaCodeCube.git",
+        "deltacodecube"
+      ]
+    }
+  }
+}
+```
+
+Restart Claude Code/Desktop. 18 tools will be available.
 
 ## Tools
 
@@ -195,7 +214,7 @@ When a file changes, its distance to dependent files is recalculated. If the dis
 
 ```bash
 # Clone
-git clone https://github.com/Memory-Bank/DeltaCodeCube.git
+git clone https://github.com/Rixmerz/DeltaCodeCube.git
 cd DeltaCodeCube
 
 # Install
@@ -220,5 +239,5 @@ Contributions welcome! Areas of interest:
 
 ## Links
 
-- **Repository**: https://github.com/Memory-Bank/DeltaCodeCube
-- **Issues**: https://github.com/Memory-Bank/DeltaCodeCube/issues
+- **Repository**: https://github.com/Rixmerz/DeltaCodeCube
+- **Issues**: https://github.com/Rixmerz/DeltaCodeCube/issues

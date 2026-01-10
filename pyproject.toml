@@ -42,9 +42,9 @@ dev = [
 deltacodecube = "deltacodecube.__main__:main"
 
 [project.urls]
-Homepage = "https://github.com/Memory-Bank/DeltaCodeCube"
-Repository = "https://github.com/Memory-Bank/DeltaCodeCube"
-Issues = "https://github.com/Memory-Bank/DeltaCodeCube/issues"
+Homepage = "https://github.com/Rixmerz/DeltaCodeCube"
+Repository = "https://github.com/Rixmerz/DeltaCodeCube"
+Issues = "https://github.com/Rixmerz/DeltaCodeCube/issues"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/deltacodecube"]

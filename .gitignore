@@ -38,6 +38,7 @@ out/
 # AI Tools
 .agentcockpit/
 .claude/
+agentcockpit-project.json
 
 # Data files
 data/
