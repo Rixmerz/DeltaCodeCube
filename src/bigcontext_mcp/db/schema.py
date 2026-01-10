@@ -6,7 +6,7 @@ CREATE TABLE IF NOT EXISTS documents (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     path TEXT NOT NULL UNIQUE,
     title TEXT NOT NULL,
-    format TEXT NOT NULL CHECK (format IN ('txt', 'md', 'pdf', 'epub', 'html')),
+    format TEXT NOT NULL CHECK (format IN ('txt', 'md', 'pdf', 'epub', 'html', 'code')),
     total_words INTEGER NOT NULL DEFAULT 0,
     total_segments INTEGER NOT NULL DEFAULT 0,
     file_hash TEXT NOT NULL,

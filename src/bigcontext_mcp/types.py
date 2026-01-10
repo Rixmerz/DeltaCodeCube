@@ -16,6 +16,7 @@ class DocumentFormat(str, Enum):
     PDF = "pdf"
     EPUB = "epub"
     HTML = "html"
+    CODE = "code"
 
 
 class SegmentType(str, Enum):
