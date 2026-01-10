@@ -2,6 +2,37 @@
 
 MCP Server for handling large documents with intelligent segmentation and TF-IDF search. Designed to work with documents of any size without saturating the model context window.
 
+## Installation
+
+### Via uvx (Recommended)
+
+No need to clone the repository! Install directly:
+
+```bash
+uvx --from git+https://github.com/Rixmerz/bigcontext_mcp.git bigcontext-mcp
+```
+
+### Configuration for Claude Desktop
+
+Add to your `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS):
+
+```json
+{
+  "mcpServers": {
+    "bigcontext": {
+      "command": "uvx",
+      "args": [
+        "--from",
+        "git+https://github.com/Rixmerz/bigcontext_mcp.git",
+        "bigcontext-mcp"
+      ]
+    }
+  }
+}
+```
+
+Restart Claude Desktop and the 31 BigContext tools will be available.
+
 ## Overview
 
 BigContext MCP allows Claude to work with extensive documents (books, manuals, research papers) by loading only relevant fragments per query, instead of the entire document. It uses automatic segmentation and TF-IDF keyword search to retrieve the most relevant content.
@@ -14,300 +45,203 @@ BigContext MCP allows Claude to work with extensive documents (books, manuals, r
 - **Efficient storage**: SQLite with WAL mode for concurrent access
 - **TF-IDF indexing**: Fast semantic search without external embeddings
 
-### Extraction Validation Tools (Domain-Agnostic)
+### 31 Domain-Agnostic Tools
 
-A comprehensive suite of **27 domain-agnostic tools** for preventing hallucination and ensuring grounded text analysis:
+#### Core Tools (5)
+| Tool | Description |
+|------|-------------|
+| `ingest_document` | Load, segment, and index a document |
+| `search_segment` | Search for relevant segments using TF-IDF |
+| `get_metadata` | Get metadata, structure, and top terms |
+| `list_documents` | List all indexed documents |
+| `compare_segments` | Compare two segments for themes and similarity |
 
-#### 1. **Literal Quote Validation**
-- `validate_literal_quote`: Verifies that quoted text exists EXACTLY in the source
-- Prevents pattern completion hallucination
-- Returns confidence levels: "textual" (exact), "partial" (similar), or "not_found"
+#### Epistemology Tools (4)
+| Tool | Description |
+|------|-------------|
+| `get_source_capabilities` | Analyze what a document CAN and CANNOT support |
+| `validate_claim` | Check if a claim can be grounded in the source |
+| `get_epistemological_report` | Complete analysis before scholarly claims |
+| `check_language_operation` | Validate linguistic operations |
 
-#### 2. **Proximity Validation**
-- `validate_proximity`: Ensures segments are adjacent (same verse or verse+1)
-- `get_adjacent_segments`: Gets segments within proximity constraint
-- Prevents narrative jump violations
+#### Semantic Tools (4)
+| Tool | Description |
+|------|-------------|
+| `detect_semantic_frames` | Identify conceptual frameworks (causal, revelational, performative) |
+| `analyze_subdetermination` | Distinguish indeterminacy from subdetermination |
+| `detect_performatives` | Identify performative speech acts |
+| `check_anachronisms` | Detect imported post-biblical concepts |
 
-#### 3. **Speaker Identification**
-- `identify_speaker`: Detects who is speaking in a segment
-- Domain-agnostic: works with any document type (religious, legal, literary, academic)
-- Accepts dynamic `priorityPatterns` and `excludePatterns`
+#### Cognitive Tools (4)
+| Tool | Description |
+|------|-------------|
+| `audit_cognitive_operations` | Validate query and output compliance |
+| `detect_inference_violations` | Scan for unauthorized connectors |
+| `get_permitted_operations` | Get allowed operations per text type |
+| `generate_safe_fallback` | Generate compliant response when violations detected |
 
-#### 4. **Pattern Contamination Detection**
-- `detect_pattern_contamination`: Detects when output completes known patterns not in source
-- Agent provides pattern definitions dynamically based on document genre
-- Works for any genre: Biblical, fairy tales, legal formulas, academic citations
-
-#### 5. **Extraction Schema Validation**
-- `validate_extraction_schema`: Validates pure data extraction without commentary
-- Detects parenthetical comments, notes sections, evaluative language
-- Enforces strict schema compliance
-
-#### 6. **Narrative Voice Detection** ⭐
-- `detect_narrative_voice`: Distinguishes voice types in text
-  - **primary_narration**: "The agent did X" = action executed in-scene
-  - **human_to_divine**: "You led them" = retrospective prayer/praise
-  - **divine_direct_speech**: "I am the X" = agent speaking
-  - **human_about_divine**: "The X is my shepherd" = descriptive
-- **DOMAIN-AGNOSTIC**: Accepts optional `DomainVocabulary` parameter
-- Works with structural patterns alone if no vocabulary provided
-- Agent provides agents, verbs, and formulas dynamically
-
-#### 7. **Agency Execution Validation** ⭐
-- `validate_agency_execution`: Distinguishes EXECUTED vs REFERENCED actions
-  - **EXECUTED**: "Fire came up from the rock" (primary narration)
-  - **REFERENCED**: "You led them with a pillar" (retrospective memory)
-- **DOMAIN-AGNOSTIC**: Accepts `agentPatterns` and `DomainVocabulary`
-- Returns: isExecuted, mode (executed/retrospective/prospective/hypothetical)
-
-#### 8. **Text Genre Detection** ⭐
-- `detect_text_genre`: Identifies genre based on structure and patterns
-- Genres: historical_narrative, narrative_poetry, prayer_praise, recapitulation, prophetic
-- **DOMAIN-AGNOSTIC**: Structural patterns + optional `domainVocabulary`
-- Agent provides domain-specific vocabulary dynamically
-
-#### 9. **Divine Agency Without Speech** ⭐
-- `detect_divine_agency_without_speech`: Finds actions without speech verbs
-- **DOMAIN-AGNOSTIC**: No hardcoded defaults
-- Agent provides `agentPatterns` and `domainVocabulary` dynamically
-- Separates SPEECH_VERB_WHITELIST from CAUSAL_ACTION_VERBS
-
-#### 10. **Weak Quantifier Detection**
-- `detect_weak_quantifiers`: Detects unsupported generalizations
-- Flags: "frequently", "typically", "generally", "always", "never"
-- Returns recommendation: "allow", "require_count", or "block"
-
-#### 11. **Existential Response Validation**
-- `validate_existential_response`: Validates YES/NO question responses
-- VALID: "YES" + evidence OR "NO" + explicit denial
-- INVALID: meta-discourse, hedging, evasion
-
-#### 12. **Source Capabilities Analysis**
-- `get_source_capabilities`: Analyzes what a document CAN and CANNOT support
-- Detects languages, original text availability, textual variants
-- Returns epistemological limitations
-
-#### 13. **Claim Validation**
-- `validate_claim`: Checks if a claim requires capabilities the document lacks
-- Prevents assertions about morphology, etymology without source support
-
-#### 14. **Epistemological Reporting**
-- `get_epistemological_report`: Complete analysis before scholarly claims
-- Returns language hard stops, canonical frame detection, auto-critique
-- Confidence decay calculation
-
-#### 15. **Language Operation Checking**
-- `check_language_operation`: Validates linguistic operations
-- Checks morphological, etymological, text-critical analysis permissions
-
-#### 16. **Semantic Frame Detection**
-- `detect_semantic_frames`: Identifies conceptual frameworks
-- Frameworks: causal, revelational, performative, invocative
-- Prevents reductive analysis
-
-#### 17. **Subdetermination Analysis**
-- `analyze_subdetermination`: Distinguishes indeterminacy from subdetermination
-- Returns what text CLOSES (excludes) vs LEAVES OPEN
-
-#### 18. **Performative Detection**
-- `detect_performatives`: Identifies performative speech acts
-- Detects patterns where divine speech IS the creative act
-
-#### 19. **Anachronism Checking**
-- `check_anachronisms`: Detects imported post-biblical concepts
-- Flags: Aristotelian causes, Neoplatonic emanation, Trinitarian doctrine
-
-#### 20. **Cognitive Operation Auditing**
-- `audit_cognitive_operations`: Validates query and output compliance
-- Detects unauthorized operations: synthesis, explanation, causality inference
-- Returns compliance status and safe fallback
-
-#### 21. **Output Vocabulary Validation**
-- `validate_output_vocabulary`: Checks if output uses only source vocabulary
-- Detects terms imported from outside the text
-
-#### 22. **Inference Violation Detection**
-- `detect_inference_violations`: Scans for unauthorized connectors
-- Flags: "therefore", "thus", "implies", "means that"
-- Detects prohibited abstract nouns
-
-#### 23. **Permitted Operations**
-- `get_permitted_operations`: Returns allowed operations per text type
-- Different genres allow different operations
-
-#### 24. **Safe Fallback Generation**
-- `generate_safe_fallback`: Generates compliant response when violations detected
-
-#### 25. **Document Vocabulary Building**
-- `build_document_vocabulary`: Creates closed vocabulary from document
-- Required before using `validate_output_vocabulary`
+#### Extraction Validators (14)
+| Tool | Description |
+|------|-------------|
+| `validate_literal_quote` | Verify quoted text exists EXACTLY in source |
+| `validate_proximity` | Check if segments are adjacent |
+| `get_adjacent_segments` | Get segments within proximity constraint |
+| `identify_speaker` | Detect who is speaking in a segment |
+| `detect_pattern_contamination` | Detect pattern completion not in source |
+| `validate_extraction_schema` | Validate pure data extraction |
+| `detect_narrative_voice` | Distinguish voice types in text |
+| `validate_agency_execution` | Distinguish EXECUTED vs REFERENCED actions |
+| `detect_text_genre` | Identify genre based on structure |
+| `detect_divine_agency_without_speech` | Find actions without speech verbs |
+| `detect_weak_quantifiers` | Detect unsupported generalizations |
+| `validate_existential_response` | Validate YES/NO question responses |
+| `build_document_vocabulary` | Create closed vocabulary from document |
+| `validate_output_vocabulary` | Check if output uses only source vocabulary |
 
 ## Domain-Agnostic Architecture
 
-### DomainVocabulary Interface
-
 All extraction validators accept an optional `DomainVocabulary` parameter:
 
-```typescript
-interface DomainVocabulary {
-  agents?: string[];              // ['God', 'Lord'] or ['Allah'] or ['the Court']
-  addressees?: string[];          // ['Lord', 'God'] or ['Your Honor']
-  oracleFormulas?: string[];      // ['thus says the Lord'] or ['the Court finds']
-  praiseFormulas?: string[];      // ['praise the Lord'] or ['glory to Allah']
-  actionVerbs?: string[];         // ['led', 'brought', 'gave', 'made', 'created']
-  narrationVerbs?: string[];      // ['said', 'spoke', 'did', 'made', 'saw']
-  stateVerbs?: string[];          // ['is', 'was', 'has been', 'will be']
-}
+```python
+class DomainVocabulary(BaseModel):
+    agents: list[str] | None = None        # ['God', 'Lord'] or ['the Court']
+    addressees: list[str] | None = None    # ['Lord'] or ['Your Honor']
+    oracle_formulas: list[str] | None = None    # ['thus says the Lord']
+    praise_formulas: list[str] | None = None    # ['praise the Lord']
+    action_verbs: list[str] | None = None       # ['led', 'brought', 'created']
+    narration_verbs: list[str] | None = None    # ['said', 'spoke', 'did']
+    state_verbs: list[str] | None = None        # ['is', 'was', 'has been']
 ```
 
-### Example Usage
-
-**Biblical text:**
-```typescript
-{
-  agents: ['God', 'Lord', 'Moses'],
-  addressees: ['Lord', 'God'],
-  actionVerbs: ['led', 'brought', 'gave', 'made', 'created', 'saved', 'delivered'],
-  narrationVerbs: ['said', 'spoke', 'did', 'made', 'saw', 'blessed'],
-  stateVerbs: ['is', 'was', 'has been'],
-  oracleFormulas: ['thus says the Lord'],
-  praiseFormulas: ['praise the Lord']
-}
-```
-
-**Legal documents:**
-```typescript
-{
-  agents: ['the Court', 'Plaintiff', 'Defendant'],
-  addressees: ['Your Honor'],
-  actionVerbs: ['ruled', 'ordered', 'granted', 'denied'],
-  narrationVerbs: ['stated', 'found', 'held', 'declared'],
-  stateVerbs: ['is', 'was'],
-  oracleFormulas: ['the Court finds'],
-  praiseFormulas: []
-}
-```
-
-**Quranic text:**
-```typescript
-{
-  agents: ['Allah', 'the Prophet'],
-  addressees: ['Allah'],
-  actionVerbs: ['guided', 'sent', 'revealed', 'blessed'],
-  narrationVerbs: ['said', 'commanded', 'decreed'],
-  stateVerbs: ['is', 'was'],
-  oracleFormulas: ['Allah says'],
-  praiseFormulas: ['glory to Allah']
-}
-```
-
-## Installation
-
-```bash
-npm install
-npm run build
-```
-
-## Configuration
-
-Add to your `~/.claude/claude_desktop_config.json`:
-
+### Example: Biblical Text
 ```json
 {
-  "mcpServers": {
-    "bigcontext": {
-      "command": "node",
-      "args": ["/path/to/bigcontext-mcp/dist/index.js"]
-    }
-  }
+  "agents": ["God", "Lord", "Moses"],
+  "addressees": ["Lord", "God"],
+  "action_verbs": ["led", "brought", "gave", "made", "created"],
+  "narration_verbs": ["said", "spoke", "did", "made", "saw"],
+  "oracle_formulas": ["thus says the Lord"],
+  "praise_formulas": ["praise the Lord"]
+}
+```
+
+### Example: Legal Documents
+```json
+{
+  "agents": ["the Court", "Plaintiff", "Defendant"],
+  "addressees": ["Your Honor"],
+  "action_verbs": ["ruled", "ordered", "granted", "denied"],
+  "narration_verbs": ["stated", "found", "held", "declared"],
+  "oracle_formulas": ["the Court finds"],
+  "praise_formulas": []
 }
 ```
 
 ## Usage Examples
 
 ### 1. Ingest a document
-```typescript
-// Ingest a PDF book
-const result = await ingest_document({
-  path: "/path/to/document.pdf",
-  title: "My Document",
-  chunkSize: 2000,
-  overlap: 100
-});
+```python
+result = ingest_document(
+    path="/path/to/document.pdf",
+    title="My Document",
+    chunk_size=2000,
+    overlap=100
+)
+# Returns: document_id, total_segments, structure
 ```
 
 ### 2. Search for content
-```typescript
-// Search within document
-const results = await search_segment({
-  query: "agency without speech",
-  documentId: 2,
-  limit: 5
-});
+```python
+results = search_segment(
+    query="agency without speech",
+    document_id=1,
+    limit=5
+)
+# Returns: matched segments with scores and snippets
 ```
 
-### 3. Validate narrative voice (domain-agnostic)
-```typescript
-// Biblical context
-const voice = await detect_narrative_voice({
-  segmentId: 722,
-  domainVocabulary: {
-    agents: ['God', 'Lord'],
-    addressees: ['Lord', 'God'],
-    actionVerbs: ['led', 'brought', 'gave', 'made'],
-    narrationVerbs: ['said', 'spoke', 'did', 'made']
-  }
-});
-
-// Legal context
-const voice = await detect_narrative_voice({
-  segmentId: 123,
-  domainVocabulary: {
-    agents: ['the Court', 'Plaintiff'],
-    addressees: ['Your Honor'],
-    actionVerbs: ['ruled', 'ordered', 'granted'],
-    narrationVerbs: ['stated', 'found', 'held']
-  }
-});
+### 3. Validate narrative voice
+```python
+voice = detect_narrative_voice(
+    segment_id=722,
+    domain_vocabulary={
+        "agents": ["God", "Lord"],
+        "addressees": ["Lord", "God"],
+        "action_verbs": ["led", "brought", "gave", "made"]
+    }
+)
+# Returns: voice_type, confidence, evidence, is_retrospective
 ```
 
-### 4. Validate agency execution (domain-agnostic)
-```typescript
-const validation = await validate_agency_execution({
-  segmentId: 762,
-  agentPatterns: ['God', 'Lord'],
-  domainVocabulary: {
-    actionVerbs: ['led', 'brought', 'gave'],
-    narrationVerbs: ['said', 'spoke', 'did', 'remembered', 'drove']
-  }
-});
-// Returns: { isExecuted: true, mode: 'executed', agent: 'Lord', action: 'drove' }
+### 4. Validate agency execution
+```python
+validation = validate_agency_execution(
+    segment_id=762,
+    divine_agent_patterns=["God", "Lord"]
+)
+# Returns: is_executed, mode, agent, action, evidence
 ```
 
-### 5. Detect genre (domain-agnostic)
-```typescript
-const genre = await detect_text_genre({
-  segmentId: 1075,
-  domainVocabulary: {
-    agents: ['God', 'He'],
-    oracleFormulas: ['thus says the Lord'],
-    praiseFormulas: ['praise the Lord']
-  }
-});
-// Returns: { genre: 'narrative_poetry', confidence: 'high' }
+### 5. Detect text genre
+```python
+genre = detect_text_genre(
+    segment_id=1075,
+    domain_vocabulary={
+        "agents": ["God", "He"],
+        "oracle_formulas": ["thus says the Lord"],
+        "praise_formulas": ["praise the Lord"]
+    }
+)
+# Returns: genre, confidence, indicators
 ```
 
-### 6. Detect agency without speech
-```typescript
-const agency = await detect_divine_agency_without_speech({
-  segmentId: 722,
-  agentPatterns: ['God', 'Lord'],
-  domainVocabulary: {
-    agents: ['God', 'Lord'],
-    narrationVerbs: ['remembered', 'drove', 'caused', 'made']
+## Technical Stack
+
+- **Python 3.11+** - Modern Python with type hints
+- **FastMCP 2.x** - MCP server framework with decorator-based tools
+- **Pydantic 2.x** - Schema validation
+- **SQLite** - Local storage with WAL mode
+- **pdfplumber** - PDF text extraction
+- **ebooklib** - EPUB support
+- **beautifulsoup4** - HTML parsing
+- **NLTK** - NLP tokenization
+
+## Development
+
+### Local Installation
+
+```bash
+# Clone repository
+git clone https://github.com/Rixmerz/bigcontext_mcp.git
+cd bigcontext_mcp
+
+# Create virtual environment
+uv venv .venv
+source .venv/bin/activate
+
+# Install in development mode
+uv pip install -e .
+
+# Run server
+python -m bigcontext_mcp
+```
+
+### Local Testing with Claude Desktop
+
+```json
+{
+  "mcpServers": {
+    "bigcontext": {
+      "command": "uv",
+      "args": [
+        "run",
+        "--directory",
+        "/path/to/bigcontext-mcp",
+        "bigcontext-mcp"
+      ]
+    }
   }
-});
-// Returns: { found: true, agent: 'God', actionVerb: 'remembered', hasSpeechVerb: false }
+}
 ```
 
 ## Architecture Highlights
@@ -329,163 +263,43 @@ const agency = await detect_divine_agency_without_speech({
 - **STRUCTURAL_NARRATIVE_VOICE_PATTERNS**: Grammar-only patterns
 - **DomainVocabulary**: Agent-provided dynamic vocabulary
 
-## Development
+## Changelog
 
-```bash
-# Install dependencies
-npm install
+### V16: Python Migration (2026-01-10)
 
-# Build
-npm run build
+**Complete rewrite from TypeScript to Python:**
+- Framework: FastMCP 2.x with decorator-based tool registration
+- Distribution: uvx-ready (zero-clone install from GitHub)
+- Database: SQLite with WAL mode (same schema, compatible)
+- Validation: Pydantic replacing Zod
+- Total: 31 MCP tools migrated and tested
 
-# Development mode
-npm run dev
-```
+### V15: Domain-Agnostic Extraction Validators
 
-## Technical Stack
+- Expanded DomainVocabulary interface with 7 dynamic properties
+- Refactored all validators to accept optional vocabulary parameter
+- Zero hardcoded domain-specific terms
 
-- **TypeScript** - Type-safe implementation
-- **SQLite (better-sqlite3)** - Fast local storage with WAL mode
-- **Zod** - Schema validation
-- **pdf-parse** - PDF text extraction
-- **@gxl/epub-parser** - EPUB support
-- **cheerio** - HTML parsing
-- **natural** - NLP tokenization
+### V14: Speech vs Action Verb Separation
+
+- Created SPEECH_VERB_WHITELIST (38 speech verbs)
+- Created CAUSAL_ACTION_VERBS (90+ action verbs)
+
+### V1-V13: Core Infrastructure
+
+- Multi-format document ingestion (txt, md, PDF, EPUB, HTML)
+- Automatic segmentation by chapters and sections
+- TF-IDF search implementation
+- SQLite storage with WAL mode
+- 27 extraction validation tools
 
 ## License
 
 MIT
 
-## Achievements
-
-### V15: Domain-Agnostic Extraction Validators (2026-01-10)
-
-**Problem Solved:**
-- All extraction validators had hardcoded biblical terms ("God", "Lord", "Moses")
-- Tools were not reusable for other domains (legal, Quranic, literary, academic)
-- Agent could not dynamically provide domain-specific vocabulary
-
-**Solution Implemented:**
-1. **Expanded DomainVocabulary interface** with 7 dynamic properties (agents, addressees, actionVerbs, narrationVerbs, stateVerbs, oracleFormulas, praiseFormulas)
-2. **Refactored STRUCTURAL_NARRATIVE_VOICE_PATTERNS** to detect only grammatical structure (no vocabulary)
-3. **Refactored detectNarrativeVoice()** to accept optional `DomainVocabulary` parameter
-4. **Refactored validateAgencyExecution()** to accept `agentPatterns` and `DomainVocabulary`
-5. **Updated tool registrations** with domain-agnostic schemas and descriptions
-6. **Verified zero hardcoded terms** in all 27 extraction validators
-
-**Impact:**
-- ✅ Tools now work with ANY domain (biblical, legal, Quranic, literary, academic)
-- ✅ Agent provides ALL vocabulary dynamically at runtime
-- ✅ Structural patterns work as fallback when no vocabulary provided
-- ✅ Compilation successful with zero hardcoded assumptions
-
----
-
-### Previous Achievements
-
-**V14: Speech vs Action Verb Separation**
-- Created `SPEECH_VERB_WHITELIST` (38 speech verbs)
-- Created `CAUSAL_ACTION_VERBS` (90+ action verbs)
-- Separated illocutory acts from narrative agency
-
-**V13: Narrative Voice Detection**
-- Implemented `detectNarrativeVoice()` to distinguish primary narration from retrospective prayer
-- Solved FALSE NEGATIVE problem: verses where God acts without speaking
-
-**V12: Extraction Schema Validators**
-- 25 comprehensive tools for preventing hallucination
-- Literal quote validation, proximity checking, pattern contamination detection
-
-**V1-V11: Core Infrastructure**
-- Multi-format document ingestion (txt, md, PDF, EPUB, HTML)
-- Automatic segmentation by chapters and sections
-- TF-IDF search implementation
-- SQLite storage with WAL mode
-
----
-
-## Future Roadmap
-
-### Planned Migration to Python + uvx
-
-We are planning to migrate BigContext MCP to Python with `uvx` distribution for significantly improved developer experience.
-
-#### Why Python + uvx?
-
-**Current limitation (TypeScript/Node.js):**
-```bash
-# Users must clone repository locally
-git clone https://github.com/Rixmerz/bigcontext_mcp.git
-cd bigcontext_mcp
-npm install
-npm run build
-
-# Then configure in Claude Desktop
-{
-  "mcpServers": {
-    "bigcontext": {
-      "command": "node",
-      "args": ["/absolute/path/to/bigcontext-mcp/dist/index.js"]
-    }
-  }
-}
-```
-
-**Planned improvement (Python + uvx):**
-```bash
-# NO need to clone repository!
-# Direct installation via uvx
-uvx bigcontext-mcp
-
-# Auto-configured in Claude Desktop
-{
-  "mcpServers": {
-    "bigcontext": {
-      "command": "uvx",
-      "args": ["bigcontext-mcp"]
-    }
-  }
-}
-```
-
-#### Benefits of uvx Distribution
-
-1. **Zero local cloning** - Install directly from PyPI
-2. **Automatic dependency management** - uvx handles Python environment
-3. **Cross-platform** - Works on macOS, Linux, Windows
-4. **Version management** - Easy updates via `uvx bigcontext-mcp@latest`
-5. **Simplified configuration** - No absolute paths needed
-
-#### Migration Plan
-
-- [ ] Port TypeScript codebase to Python
-- [ ] Maintain API compatibility (same 27 tools)
-- [ ] Package for PyPI distribution
-- [ ] Test uvx installation workflow
-- [ ] Update documentation
-- [ ] Deprecate Node.js version after Python stability
-
-#### Technical Stack (Python)
-
-- **FastMCP** - MCP server framework
-- **SQLite** - Same database (compatible)
-- **PyPDF2** - PDF parsing
-- **beautifulsoup4** - HTML parsing
-- **ebooklib** - EPUB support
-- **scikit-learn** - TF-IDF (or custom implementation)
-
-#### Timeline
-
-Target: Q2 2026
-
-**Contributions welcome!** If you're interested in helping with the Python migration, please open an issue or PR.
-
----
-
 ## Contributing
 
 We welcome contributions! Areas of interest:
-- Python migration to uvx
 - Additional domain vocabularies (legal, academic, literary)
 - New extraction validators
 - Performance optimizations
@@ -494,4 +308,4 @@ We welcome contributions! Areas of interest:
 ## Support
 
 - **Issues**: https://github.com/Rixmerz/bigcontext_mcp/issues
-- **Discussions**: https://github.com/Rixmerz/bigcontext_mcp/discussions
+- **Repository**: https://github.com/Rixmerz/bigcontext_mcp
