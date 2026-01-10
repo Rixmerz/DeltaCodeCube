@@ -1312,3 +1312,110 @@ def cube_get_deltas(limit: int = 20) -> dict[str, Any]:
             "deltas": deltas,
             "count": len(deltas),
         }
+
+
+# =============================================================================
+# Phase 4: Advanced Search Tools
+# =============================================================================
+
+
+@mcp.tool()
+def cube_compare(path_a: str, path_b: str) -> dict[str, Any]:
+    """
+    Compare two code files in the DeltaCodeCube.
+
+    Shows detailed comparison including:
+    - Distance in each axis (lexical, structural, semantic)
+    - Overall similarity score
+    - Insights about what makes them similar/different
+
+    Useful for:
+    - Understanding code relationships
+    - Finding refactoring opportunities
+    - Comparing implementations
+
+    Args:
+        path_a: Absolute path to first file.
+        path_b: Absolute path to second file.
+
+    Returns:
+        Detailed comparison with distances, similarity, and insights.
+    """
+    with get_connection() as conn:
+        cube = DeltaCodeCube(conn)
+        return cube.compare_files(path_a, path_b)
+
+
+@mcp.tool()
+def cube_export_positions(
+    format: str = "3d",
+    include_features: bool = False,
+) -> dict[str, Any]:
+    """
+    Export code point positions for external visualization.
+
+    Exports all indexed files with their positions in the 63D feature space.
+    Supports multiple formats for different visualization tools.
+
+    Args:
+        format: Export format:
+               - '3d': Simplified 3D coordinates (x=lexical, y=structural, z=semantic)
+               - 'json': Full JSON with optional feature vectors
+               - 'csv': CSV-ready format with headers
+        include_features: Include full 63D feature vectors (only for 'json' format).
+
+    Returns:
+        Export data with positions and metadata.
+    """
+    with get_connection() as conn:
+        cube = DeltaCodeCube(conn)
+        return cube.export_positions(format=format, include_features=include_features)
+
+
+@mcp.tool()
+def cube_find_by_criteria(
+    domain: str | None = None,
+    min_lines: int | None = None,
+    max_lines: int | None = None,
+    similar_to: str | None = None,
+    limit: int = 20,
+) -> dict[str, Any]:
+    """
+    Find files matching multiple criteria.
+
+    Combines domain filtering, size filtering, and similarity search
+    in a single query. More flexible than individual search tools.
+
+    Args:
+        domain: Filter by domain ('auth', 'db', 'api', 'ui', 'util').
+        min_lines: Minimum line count filter.
+        max_lines: Maximum line count filter.
+        similar_to: Path to file to find similar files to.
+        limit: Maximum results (default: 20).
+
+    Returns:
+        List of matching files with optional similarity scores.
+
+    Examples:
+        - Find large DB files: domain="db", min_lines=200
+        - Find small API files similar to X: domain="api", max_lines=100, similar_to="/path/to/x.js"
+    """
+    with get_connection() as conn:
+        cube = DeltaCodeCube(conn)
+        results = cube.find_by_criteria(
+            domain=domain,
+            min_lines=min_lines,
+            max_lines=max_lines,
+            similar_to=similar_to,
+            limit=limit,
+        )
+        return {
+            "files": results,
+            "count": len(results),
+            "filters": {
+                "domain": domain,
+                "min_lines": min_lines,
+                "max_lines": max_lines,
+                "similar_to": similar_to,
+            },
+        }

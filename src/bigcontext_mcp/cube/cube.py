@@ -261,6 +261,248 @@ class DeltaCodeCube:
 
         return results[:limit]
 
+    def compare_files(
+        self,
+        file_path_a: str,
+        file_path_b: str,
+    ) -> dict[str, Any]:
+        """
+        Compare two files in the cube.
+
+        Shows detailed comparison including:
+        - Distance in each axis
+        - Similarity score
+        - What makes them similar/different
+
+        Args:
+            file_path_a: Path to first file.
+            file_path_b: Path to second file.
+
+        Returns:
+            Detailed comparison dictionary.
+        """
+        path_a = str(Path(file_path_a).resolve())
+        path_b = str(Path(file_path_b).resolve())
+
+        cp_a = self.get_code_point(path_a)
+        cp_b = self.get_code_point(path_b)
+
+        if not cp_a:
+            return {"error": f"File not indexed: {path_a}"}
+        if not cp_b:
+            return {"error": f"File not indexed: {path_b}"}
+
+        # Calculate distances
+        total_distance = cp_a.distance_to(cp_b)
+        lexical_distance = cp_a.distance_in_axis(cp_b, "lexical")
+        structural_distance = cp_a.distance_in_axis(cp_b, "structural")
+        semantic_distance = cp_a.distance_in_axis(cp_b, "semantic")
+        similarity = cp_a.similarity_to(cp_b)
+
+        # Determine what axis contributes most to difference
+        distances = {
+            "lexical": lexical_distance,
+            "structural": structural_distance,
+            "semantic": semantic_distance,
+        }
+        most_different = max(distances, key=distances.get)
+        most_similar = min(distances, key=distances.get)
+
+        # Generate insights
+        insights = []
+        if lexical_distance < 0.5:
+            insights.append("Similar terminology/naming conventions")
+        elif lexical_distance > 1.5:
+            insights.append("Very different vocabulary")
+
+        if structural_distance < 0.3:
+            insights.append("Similar code structure (complexity, size)")
+        elif structural_distance > 0.8:
+            insights.append("Different structural complexity")
+
+        if semantic_distance < 0.2:
+            insights.append("Same functional domain")
+        elif semantic_distance > 0.5:
+            insights.append("Different functional domains")
+
+        return {
+            "file_a": {
+                "path": path_a,
+                "name": Path(path_a).name,
+                "domain": cp_a.dominant_domain,
+                "lines": cp_a.line_count,
+            },
+            "file_b": {
+                "path": path_b,
+                "name": Path(path_b).name,
+                "domain": cp_b.dominant_domain,
+                "lines": cp_b.line_count,
+            },
+            "comparison": {
+                "total_distance": total_distance,
+                "similarity": similarity,
+                "similarity_percent": f"{similarity * 100:.1f}%",
+                "lexical_distance": lexical_distance,
+                "structural_distance": structural_distance,
+                "semantic_distance": semantic_distance,
+                "most_different_axis": most_different,
+                "most_similar_axis": most_similar,
+            },
+            "insights": insights,
+        }
+
+    def export_positions(
+        self,
+        format: str = "json",
+        include_features: bool = False,
+    ) -> dict[str, Any]:
+        """
+        Export all code point positions for visualization.
+
+        Args:
+            format: Export format ('json', 'csv', '3d').
+            include_features: Include full feature vectors.
+
+        Returns:
+            Export data suitable for visualization tools.
+        """
+        all_points = self._get_all_code_points()
+
+        if format == "3d":
+            # Export as simplified 3D coordinates (mean of each axis)
+            points_3d = []
+            for cp in all_points:
+                points_3d.append({
+                    "id": cp.id,
+                    "name": Path(cp.file_path).name,
+                    "path": cp.file_path,
+                    "x": float(np.mean(cp.lexical)),  # Lexical centroid
+                    "y": float(np.mean(cp.structural)),  # Structural centroid
+                    "z": float(np.mean(cp.semantic)),  # Semantic centroid
+                    "domain": cp.dominant_domain,
+                    "lines": cp.line_count,
+                })
+            return {
+                "format": "3d",
+                "description": "Simplified 3D coordinates (axis centroids)",
+                "axes": {"x": "lexical", "y": "structural", "z": "semantic"},
+                "points": points_3d,
+                "count": len(points_3d),
+            }
+
+        elif format == "csv":
+            # Export as CSV-ready data
+            rows = []
+            headers = ["id", "name", "path", "domain", "lines", "lexical_mean", "structural_mean", "semantic_mean"]
+            for cp in all_points:
+                rows.append({
+                    "id": cp.id,
+                    "name": Path(cp.file_path).name,
+                    "path": cp.file_path,
+                    "domain": cp.dominant_domain,
+                    "lines": cp.line_count,
+                    "lexical_mean": float(np.mean(cp.lexical)),
+                    "structural_mean": float(np.mean(cp.structural)),
+                    "semantic_mean": float(np.mean(cp.semantic)),
+                })
+            return {
+                "format": "csv",
+                "headers": headers,
+                "rows": rows,
+                "count": len(rows),
+            }
+
+        else:  # json (default)
+            points_json = []
+            for cp in all_points:
+                point_data = {
+                    "id": cp.id,
+                    "name": Path(cp.file_path).name,
+                    "path": cp.file_path,
+                    "domain": cp.dominant_domain,
+                    "lines": cp.line_count,
+                    "position": {
+                        "lexical_mean": float(np.mean(cp.lexical)),
+                        "structural_mean": float(np.mean(cp.structural)),
+                        "semantic_mean": float(np.mean(cp.semantic)),
+                    },
+                }
+                if include_features:
+                    point_data["features"] = {
+                        "lexical": cp.lexical.tolist(),
+                        "structural": cp.structural.tolist(),
+                        "semantic": cp.semantic.tolist(),
+                    }
+                points_json.append(point_data)
+
+            return {
+                "format": "json",
+                "include_features": include_features,
+                "points": points_json,
+                "count": len(points_json),
+            }
+
+    def find_by_criteria(
+        self,
+        domain: str | None = None,
+        min_lines: int | None = None,
+        max_lines: int | None = None,
+        similar_to: str | None = None,
+        limit: int = 20,
+    ) -> list[dict[str, Any]]:
+        """
+        Find files matching multiple criteria.
+
+        Args:
+            domain: Filter by domain ('auth', 'db', 'api', 'ui', 'util').
+            min_lines: Minimum line count.
+            max_lines: Maximum line count.
+            similar_to: Path to file to find similar files to.
+            limit: Maximum results.
+
+        Returns:
+            List of matching files.
+        """
+        all_points = self._get_all_code_points()
+        results = []
+
+        # Get reference point if similar_to specified
+        reference = None
+        if similar_to:
+            reference = self.get_code_point(similar_to)
+
+        for cp in all_points:
+            # Apply filters
+            if domain and cp.dominant_domain != domain:
+                continue
+            if min_lines and cp.line_count < min_lines:
+                continue
+            if max_lines and cp.line_count > max_lines:
+                continue
+
+            result = {
+                "id": cp.id,
+                "file_path": cp.file_path,
+                "file_name": Path(cp.file_path).name,
+                "domain": cp.dominant_domain,
+                "lines": cp.line_count,
+            }
+
+            # Add similarity if reference provided
+            if reference and cp.id != reference.id:
+                result["distance"] = reference.distance_to(cp)
+                result["similarity"] = reference.similarity_to(cp)
+
+            results.append(result)
+
+        # Sort by similarity if reference provided, otherwise by lines
+        if reference:
+            results.sort(key=lambda x: x.get("distance", float("inf")))
+        else:
+            results.sort(key=lambda x: x["lines"], reverse=True)
+
+        return results[:limit]
+
     def search_by_domain(self, domain: str, limit: int = 10) -> list[dict[str, Any]]:
         """
         Find files by semantic domain.
