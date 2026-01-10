@@ -87,6 +87,18 @@ class CodePoint:
         else:
             return self.euclidean_distance_to(other)
 
+    @staticmethod
+    def _normalize_vectors(v1: np.ndarray, v2: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+        """Normalize two vectors to the same dimension by padding the shorter one."""
+        if len(v1) == len(v2):
+            return v1, v2
+        max_len = max(len(v1), len(v2))
+        if len(v1) < max_len:
+            v1 = np.pad(v1, (0, max_len - len(v1)), mode='constant', constant_values=0)
+        if len(v2) < max_len:
+            v2 = np.pad(v2, (0, max_len - len(v2)), mode='constant', constant_values=0)
+        return v1, v2
+
     def euclidean_distance_to(self, other: "CodePoint") -> float:
         """
         Calculate Euclidean distance to another CodePoint.
@@ -97,7 +109,8 @@ class CodePoint:
         Returns:
             Euclidean distance between positions.
         """
-        return float(np.linalg.norm(self.position - other.position))
+        pos1, pos2 = self._normalize_vectors(self.position, other.position)
+        return float(np.linalg.norm(pos1 - pos2))
 
     def cosine_distance_to(self, other: "CodePoint") -> float:
         """
@@ -136,6 +149,9 @@ class CodePoint:
         else:
             raise ValueError(f"Unknown axis: {axis}. Use 'lexical', 'structural', or 'semantic'.")
 
+        # Normalize vectors to same dimension
+        v1, v2 = self._normalize_vectors(v1, v2)
+
         if method == "cosine":
             return self._cosine_distance(v1, v2)
         else:
@@ -144,6 +160,14 @@ class CodePoint:
     @staticmethod
     def _cosine_distance(v1: np.ndarray, v2: np.ndarray) -> float:
         """Calculate cosine distance between two vectors."""
+        # Normalize to same dimension
+        if len(v1) != len(v2):
+            max_len = max(len(v1), len(v2))
+            if len(v1) < max_len:
+                v1 = np.pad(v1, (0, max_len - len(v1)), mode='constant', constant_values=0)
+            if len(v2) < max_len:
+                v2 = np.pad(v2, (0, max_len - len(v2)), mode='constant', constant_values=0)
+
         norm1 = np.linalg.norm(v1)
         norm2 = np.linalg.norm(v2)
 
@@ -163,8 +187,7 @@ class CodePoint:
         Returns:
             Cosine similarity (0 to 1, higher is more similar).
         """
-        pos1 = self.position
-        pos2 = other.position
+        pos1, pos2 = self._normalize_vectors(self.position, other.position)
         norm1 = np.linalg.norm(pos1)
         norm2 = np.linalg.norm(pos2)
 
