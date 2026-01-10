@@ -18,7 +18,9 @@ import numpy as np
 
 from bigcontext_mcp.cube.code_point import CodePoint, create_code_point
 from bigcontext_mcp.cube.contracts import Contract, ContractDetector
+from bigcontext_mcp.cube.delta import Delta, DeltaTracker, create_delta
 from bigcontext_mcp.cube.features.semantic import get_dominant_domain
+from bigcontext_mcp.cube.tension import Tension, TensionDetector
 from bigcontext_mcp.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -50,6 +52,8 @@ class DeltaCodeCube:
         self.conn = conn
         self._ensure_tables()
         self.contract_detector = ContractDetector(conn)
+        self.delta_tracker = DeltaTracker(conn)
+        self.tension_detector = TensionDetector(conn)
 
     def _ensure_tables(self) -> None:
         """Ensure cube tables exist in database."""
@@ -415,6 +419,192 @@ class DeltaCodeCube:
     def get_contract_stats(self) -> dict[str, Any]:
         """Get statistics about contracts."""
         return self.contract_detector.get_contract_stats()
+
+    # =========================================================================
+    # Delta and Tension operations
+    # =========================================================================
+
+    def reindex_file(self, file_path: str) -> dict[str, Any]:
+        """
+        Re-index a file and detect deltas/tensions.
+
+        This method should be called when a file changes. It:
+        1. Gets the current CodePoint (before changes)
+        2. Creates a new CodePoint from the updated file
+        3. Creates a Delta recording the movement
+        4. Detects any tensions with dependent files
+        5. Updates the CodePoint in database
+
+        Args:
+            file_path: Path to the file that changed.
+
+        Returns:
+            Dictionary with delta and tensions information.
+        """
+        path = Path(file_path).resolve()
+
+        # Get existing CodePoint
+        old_code_point = self.get_code_point(str(path))
+
+        if not old_code_point:
+            # File not indexed yet, just index it
+            new_cp = self.index_file(str(path))
+            return {
+                "status": "indexed",
+                "message": "File was not previously indexed. Indexed now.",
+                "code_point_id": new_cp.id,
+                "delta": None,
+                "tensions": [],
+            }
+
+        # Read new content
+        content = path.read_text(encoding="utf-8")
+
+        # Create new CodePoint
+        new_code_point = create_code_point(str(path), content)
+        new_code_point.created_at = old_code_point.created_at  # Preserve creation time
+
+        # Create Delta
+        delta = create_delta(old_code_point, new_code_point)
+
+        # Only process if there's significant movement
+        if delta.movement_magnitude < 0.01:
+            return {
+                "status": "unchanged",
+                "message": "No significant changes detected.",
+                "code_point_id": new_code_point.id,
+                "delta": None,
+                "tensions": [],
+            }
+
+        # Save delta
+        self.delta_tracker.save_delta(delta)
+
+        # Detect tensions
+        code_points = {cp.id: cp for cp in self._get_all_code_points()}
+        code_points[new_code_point.id] = new_code_point
+
+        tensions = self.tension_detector.detect_tensions(
+            delta=delta,
+            new_code_point=new_code_point,
+            code_points=code_points,
+        )
+
+        # Save tensions
+        self.tension_detector.save_tensions(tensions)
+
+        # Update CodePoint in database
+        self._update_code_point(new_code_point)
+
+        return {
+            "status": "reindexed",
+            "message": f"Detected {len(tensions)} tension(s).",
+            "code_point_id": new_code_point.id,
+            "delta": delta.to_dict(),
+            "tensions": [t.to_dict() for t in tensions],
+        }
+
+    def analyze_impact(self, file_path: str) -> dict[str, Any]:
+        """
+        Analyze potential impact if a file were to change.
+
+        Shows all files that depend on this file (incoming contracts)
+        and their current distances.
+
+        Args:
+            file_path: Path to the file to analyze.
+
+        Returns:
+            Impact analysis with dependents and their distances.
+        """
+        path = str(Path(file_path).resolve())
+        code_point = self.get_code_point(path)
+
+        if not code_point:
+            return {
+                "status": "error",
+                "message": "File not indexed.",
+                "file_path": path,
+                "dependents": [],
+            }
+
+        # Get incoming contracts (files that depend on this file)
+        contracts = self.contract_detector.get_contracts_for_file(path, direction="incoming")
+
+        dependents = []
+        for contract in contracts:
+            caller_cp = self._get_code_point_by_path(contract.caller_path)
+            if caller_cp:
+                current_distance = caller_cp.distance_to(code_point)
+                dependents.append({
+                    "file_path": contract.caller_path,
+                    "file_name": Path(contract.caller_path).name,
+                    "baseline_distance": contract.baseline_distance,
+                    "current_distance": current_distance,
+                    "distance_delta": current_distance - contract.baseline_distance,
+                })
+
+        return {
+            "status": "ok",
+            "file_path": path,
+            "file_name": Path(path).name,
+            "code_point_id": code_point.id,
+            "dominant_domain": code_point.dominant_domain,
+            "dependent_count": len(dependents),
+            "dependents": dependents,
+            "message": (
+                f"{len(dependents)} file(s) depend on this file. "
+                f"Changes may affect them."
+            ),
+        }
+
+    def get_tensions(
+        self,
+        status: str | None = None,
+        limit: int = 50,
+    ) -> list[dict[str, Any]]:
+        """
+        Get detected tensions.
+
+        Args:
+            status: Filter by status ('detected', 'reviewed', 'resolved', 'ignored').
+            limit: Maximum results.
+
+        Returns:
+            List of tension dictionaries.
+        """
+        tensions = self.tension_detector.get_tensions(status=status, limit=limit)
+        return [t.to_dict() for t in tensions]
+
+    def resolve_tension(self, tension_id: str, status: str = "resolved") -> bool:
+        """
+        Update the status of a tension.
+
+        Args:
+            tension_id: ID of the tension.
+            status: New status ('reviewed', 'resolved', 'ignored').
+
+        Returns:
+            True if updated, False if not found.
+        """
+        return self.tension_detector.update_tension_status(tension_id, status)
+
+    def get_tension_stats(self) -> dict[str, Any]:
+        """Get statistics about tensions."""
+        return self.tension_detector.get_tension_stats()
+
+    def get_deltas(self, limit: int = 20) -> list[dict[str, Any]]:
+        """
+        Get recent deltas.
+
+        Args:
+            limit: Maximum results.
+
+        Returns:
+            List of delta dictionaries.
+        """
+        deltas = self.delta_tracker.get_recent_deltas(limit=limit)
+        return [d.to_dict() for d in deltas]
 
     # =========================================================================
     # Database operations
