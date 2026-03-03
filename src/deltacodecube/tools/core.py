@@ -4,6 +4,7 @@ from typing import Any
 
 from deltacodecube.db.database import get_connection
 from deltacodecube.cube import DeltaCodeCube
+from deltacodecube.utils import convert_numpy_types
 
 
 def register_core_tools(mcp):
@@ -26,7 +27,7 @@ def register_core_tools(mcp):
         with get_connection() as conn:
             cube = DeltaCodeCube(conn)
             code_point = cube.index_file(path)
-            return code_point.to_dict()
+            return convert_numpy_types(code_point.to_dict())
 
     @mcp.tool()
     def cube_index_directory(
@@ -37,20 +38,29 @@ def register_core_tools(mcp):
         """
         Index all code files in a directory.
 
+        Automatically prunes stale files (deleted from disk) before indexing
+        to keep the index in sync with the filesystem.
+
         Args:
             path: Absolute path to directory.
             patterns: Glob patterns for files (default: js, ts, py, go, java).
             recursive: Whether to search recursively (default: True).
 
         Returns:
-            Summary of indexed files.
+            Summary of indexed files and pruned stale entries.
         """
         with get_connection() as conn:
             cube = DeltaCodeCube(conn)
+
+            # Prune files that no longer exist on disk
+            pruned = cube.prune_stale_files()
+
             code_points = cube.index_directory(path, patterns, recursive)
 
-            return {
+            return convert_numpy_types({
                 "indexed_count": len(code_points),
+                "pruned_count": len(pruned),
+                "pruned_files": pruned,
                 "files": [
                     {
                         "path": cp.file_path,
@@ -59,6 +69,27 @@ def register_core_tools(mcp):
                     }
                     for cp in code_points
                 ],
+            })
+
+    @mcp.tool()
+    def cube_prune_stale(
+    ) -> dict[str, Any]:
+        """
+        Remove indexed files that no longer exist on disk.
+
+        Scans all indexed code points and deletes entries whose files
+        have been removed from the filesystem. Also cleans up contracts
+        referencing pruned files.
+
+        Returns:
+            Count and list of pruned file paths.
+        """
+        with get_connection() as conn:
+            cube = DeltaCodeCube(conn)
+            pruned = cube.prune_stale_files()
+            return {
+                "pruned_count": len(pruned),
+                "pruned_files": pruned,
             }
 
     @mcp.tool()
@@ -82,7 +113,7 @@ def register_core_tools(mcp):
             if not position:
                 return {"error": f"File not indexed: {path}"}
 
-            return position
+            return convert_numpy_types(position)
 
     @mcp.tool()
     def cube_find_similar(
@@ -111,7 +142,7 @@ def register_core_tools(mcp):
             if not results:
                 return {"error": f"File not indexed or no similar files found: {path}"}
 
-            return {"similar_files": results}
+            return convert_numpy_types({"similar_files": results})
 
     @mcp.tool()
     def cube_search_by_domain(domain: str, limit: int = 10) -> dict[str, Any]:
@@ -130,7 +161,7 @@ def register_core_tools(mcp):
         with get_connection() as conn:
             cube = DeltaCodeCube(conn)
             results = cube.search_by_domain(domain, limit)
-            return {"files": results, "domain": domain, "count": len(results)}
+            return convert_numpy_types({"files": results, "domain": domain, "count": len(results)})
 
     @mcp.tool()
     def cube_get_stats() -> dict[str, Any]:
@@ -144,7 +175,7 @@ def register_core_tools(mcp):
         """
         with get_connection() as conn:
             cube = DeltaCodeCube(conn)
-            return cube.get_stats()
+            return convert_numpy_types(cube.get_stats())
 
     @mcp.tool()
     def cube_list_code_points(limit: int = 100, offset: int = 0) -> dict[str, Any]:
@@ -161,4 +192,4 @@ def register_core_tools(mcp):
         with get_connection() as conn:
             cube = DeltaCodeCube(conn)
             code_points = cube.list_code_points(limit, offset)
-            return {"code_points": code_points, "count": len(code_points)}
+            return convert_numpy_types({"code_points": code_points, "count": len(code_points)})

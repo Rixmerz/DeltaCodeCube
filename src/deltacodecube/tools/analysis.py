@@ -3,6 +3,7 @@
 from typing import Any
 
 from deltacodecube.db.database import get_connection
+from deltacodecube.utils import convert_numpy_types
 
 
 def register_analysis_tools(mcp):
@@ -38,7 +39,7 @@ def register_analysis_tools(mcp):
         from deltacodecube.cube.graph import analyze_dependency_graph
 
         with get_connection() as conn:
-            return analyze_dependency_graph(conn, top_n=top_n)
+            return convert_numpy_types(analyze_dependency_graph(conn, top_n=top_n))
 
     @mcp.tool()
     def cube_get_centrality(
@@ -72,10 +73,15 @@ def register_analysis_tools(mcp):
                     "error": f"File not found in index: {path}",
                     "suggestion": "Index the file first with cube_index_file",
                 }
-            return result
+            return convert_numpy_types(result)
 
     @mcp.tool()
-    def cube_detect_smells() -> dict[str, Any]:
+    def cube_detect_smells(
+        min_severity: str | None = None,
+        smell_type: str | None = None,
+        summary_only: bool = False,
+        limit: int = 50,
+    ) -> dict[str, Any]:
         """
         Detect code smells in the indexed codebase.
 
@@ -90,28 +96,41 @@ def register_analysis_tools(mcp):
 
         Returns smells sorted by severity (critical, high, medium, low).
 
-        Returns:
-            Summary with total smells, breakdown by type/severity, and details.
+        Args:
+            min_severity: Only include smells at this severity or higher.
+                          One of: critical, high, medium, low.
+            smell_type: Only include smells of this type (e.g. god_file, orphan,
+                        circular_dependency, feature_envy, hub_overload,
+                        unstable_interface, dead_code_candidate).
+            summary_only: If True, return only aggregated counts (no smells
+                          array). Useful for lightweight overview.
+            limit: Max number of smell details to return (default 50).
 
-        Example output:
-            {
-                "total_smells": 5,
-                "by_severity": {"high": 2, "medium": 3},
-                "smells": [
-                    {
-                        "type": "god_file",
-                        "severity": "high",
-                        "file_name": "database.js",
-                        "description": "God File: 12 files depend on this...",
-                        "suggestion": "Consider splitting..."
-                    }
-                ]
-            }
+        Returns:
+            Summary with total smells, breakdown by type/severity, and
+            optionally the filtered smells array.
+
+        Example — summary only:
+            cube_detect_smells(summary_only=True)
+            → {"total_smells": 25, "by_type": {...}, "by_severity": {...}, "hint": "..."}
+
+        Example — filtered details:
+            cube_detect_smells(min_severity="critical")
+            → {"total_smells": 25, ..., "smells": [<only critical smells>]}
+
+            cube_detect_smells(smell_type="god_file", limit=5)
+            → {"total_smells": 25, ..., "smells": [<up to 5 god_file smells>]}
         """
         from deltacodecube.cube.smells import get_smell_summary
 
         with get_connection() as conn:
-            return get_smell_summary(conn)
+            return convert_numpy_types(get_smell_summary(
+                conn,
+                summary_only=summary_only,
+                min_severity=min_severity,
+                smell_type=smell_type,
+                limit=limit,
+            ))
 
     @mcp.tool()
     def cube_cluster_files(
@@ -143,7 +162,7 @@ def register_analysis_tools(mcp):
         from deltacodecube.cube.clustering import cluster_codebase
 
         with get_connection() as conn:
-            return cluster_codebase(conn, k=k)
+            return convert_numpy_types(cluster_codebase(conn, k=k))
 
     @mcp.tool()
     def cube_get_suggestions() -> dict[str, Any]:
@@ -191,7 +210,7 @@ def register_analysis_tools(mcp):
         from deltacodecube.cube.advisor import get_refactoring_suggestions
 
         with get_connection() as conn:
-            return get_refactoring_suggestions(conn)
+            return convert_numpy_types(get_refactoring_suggestions(conn))
 
     @mcp.tool()
     def cube_simulate_wave(
@@ -233,7 +252,7 @@ def register_analysis_tools(mcp):
         from deltacodecube.cube.waves import simulate_tension_wave
 
         with get_connection() as conn:
-            return simulate_tension_wave(conn, source_path, intensity)
+            return convert_numpy_types(simulate_tension_wave(conn, source_path, intensity))
 
     @mcp.tool()
     def cube_predict_impact(
@@ -272,7 +291,7 @@ def register_analysis_tools(mcp):
         from deltacodecube.cube.waves import predict_change_impact
 
         with get_connection() as conn:
-            return predict_change_impact(conn, path)
+            return convert_numpy_types(predict_change_impact(conn, path))
 
     @mcp.tool()
     def cube_detect_clones() -> dict[str, Any]:
@@ -299,7 +318,7 @@ def register_analysis_tools(mcp):
         from deltacodecube.cube.clones import detect_code_clones
 
         with get_connection() as conn:
-            return detect_code_clones(conn)
+            return convert_numpy_types(detect_code_clones(conn))
 
     @mcp.tool()
     def cube_get_debt() -> dict[str, Any]:
@@ -332,7 +351,7 @@ def register_analysis_tools(mcp):
         from deltacodecube.cube.debt import calculate_technical_debt
 
         with get_connection() as conn:
-            return calculate_technical_debt(conn)
+            return convert_numpy_types(calculate_technical_debt(conn))
 
     @mcp.tool()
     def cube_analyze_surface() -> dict[str, Any]:
@@ -356,7 +375,7 @@ def register_analysis_tools(mcp):
         from deltacodecube.cube.surface import analyze_api_surface
 
         with get_connection() as conn:
-            return analyze_api_surface(conn)
+            return convert_numpy_types(analyze_api_surface(conn))
 
     @mcp.tool()
     def cube_detect_drift() -> dict[str, Any]:
@@ -379,4 +398,4 @@ def register_analysis_tools(mcp):
         from deltacodecube.cube.drift import detect_drift
 
         with get_connection() as conn:
-            return detect_drift(conn)
+            return convert_numpy_types(detect_drift(conn))

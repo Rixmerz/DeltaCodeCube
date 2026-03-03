@@ -4,6 +4,7 @@ from typing import Any
 
 from deltacodecube.db.database import get_connection
 from deltacodecube.cube import DeltaCodeCube
+from deltacodecube.utils import convert_numpy_types
 
 
 def register_search_tools(mcp):
@@ -33,7 +34,7 @@ def register_search_tools(mcp):
         """
         with get_connection() as conn:
             cube = DeltaCodeCube(conn)
-            return cube.compare_files(path_a, path_b)
+            return convert_numpy_types(cube.compare_files(path_a, path_b))
 
     @mcp.tool()
     def cube_export_positions(
@@ -58,7 +59,7 @@ def register_search_tools(mcp):
         """
         with get_connection() as conn:
             cube = DeltaCodeCube(conn)
-            return cube.export_positions(format=format, include_features=include_features)
+            return convert_numpy_types(cube.export_positions(format=format, include_features=include_features))
 
     @mcp.tool()
     def cube_find_by_criteria(
@@ -209,7 +210,7 @@ def register_search_tools(mcp):
                 return {
                     "success": True,
                     "html_length": len(html),
-                    "html": html[:1000] + "..." if len(html) > 1000 else html,
+                    "html": html,
                     "stats": {
                         "files": len(code_points),
                         "contracts": len(contracts),

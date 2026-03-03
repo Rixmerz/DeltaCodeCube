@@ -433,29 +433,62 @@ def detect_code_smells(conn: sqlite3.Connection) -> list[dict[str, Any]]:
     return [s.to_dict() for s in smells]
 
 
-def get_smell_summary(conn: sqlite3.Connection) -> dict[str, Any]:
+_SEVERITY_RANK = {"critical": 0, "high": 1, "medium": 2, "low": 3}
+
+
+def get_smell_summary(
+    conn: sqlite3.Connection,
+    summary_only: bool = False,
+    min_severity: str | None = None,
+    smell_type: str | None = None,
+    limit: int = 50,
+) -> dict[str, Any]:
     """
-    Get summary of detected code smells.
+    Get summary of detected code smells with optional filtering.
 
     Args:
         conn: Database connection.
+        summary_only: If True, return only aggregated counts (no smells array).
+        min_severity: Filter smells to this severity or higher
+                      (critical > high > medium > low).
+        smell_type: Filter by smell type (god_file, orphan, etc.).
+        limit: Max smells to include in the details array (default 50).
 
     Returns:
-        Summary with counts by type and severity.
+        Summary with counts by type and severity, and optionally filtered smells.
     """
     detector = SmellDetector(conn)
-    smells = detector.detect_all()
+    all_smells = detector.detect_all()
 
+    # --- aggregated counts (always computed from ALL smells, pre-filter) ---
     by_type: dict[str, int] = {}
     by_severity: dict[str, int] = {}
-
-    for smell in smells:
+    for smell in all_smells:
         by_type[smell.smell_type] = by_type.get(smell.smell_type, 0) + 1
         by_severity[smell.severity] = by_severity.get(smell.severity, 0) + 1
 
-    return {
-        "total_smells": len(smells),
+    result: dict[str, Any] = {
+        "total_smells": len(all_smells),
         "by_type": by_type,
         "by_severity": by_severity,
-        "smells": [s.to_dict() for s in smells],
     }
+
+    if summary_only:
+        result["hint"] = (
+            "Use cube_detect_smells(smell_type='...') or "
+            "cube_detect_smells(min_severity='critical') to see full details."
+        )
+        return result
+
+    # --- apply filters for the details array ---
+    filtered = all_smells
+
+    if min_severity is not None:
+        threshold = _SEVERITY_RANK.get(min_severity, 3)
+        filtered = [s for s in filtered if _SEVERITY_RANK.get(s.severity, 4) <= threshold]
+
+    if smell_type is not None:
+        filtered = [s for s in filtered if s.smell_type == smell_type]
+
+    result["smells"] = [s.to_dict() for s in filtered[:limit]]
+    return result

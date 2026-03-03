@@ -371,23 +371,38 @@ class DeltaCodeCube:
         all_points = self._get_all_code_points()
 
         if format == "3d":
-            # Export as simplified 3D coordinates (mean of each axis)
+            # Use PCA to reduce from full feature space to 3D
             points_3d = []
-            for cp in all_points:
-                points_3d.append({
-                    "id": cp.id,
-                    "name": Path(cp.file_path).name,
-                    "path": cp.file_path,
-                    "x": float(np.mean(cp.lexical)),  # Lexical centroid
-                    "y": float(np.mean(cp.structural)),  # Structural centroid
-                    "z": float(np.mean(cp.semantic)),  # Semantic centroid
-                    "domain": cp.dominant_domain,
-                    "lines": cp.line_count,
-                })
+            if all_points:
+                features = np.array([
+                    np.concatenate([cp.lexical, cp.structural, cp.semantic])
+                    for cp in all_points
+                ])
+                if len(features) >= 2:
+                    # Center the data
+                    mean = features.mean(axis=0)
+                    centered = features - mean
+                    # SVD for PCA (first 3 principal components)
+                    U, S, Vt = np.linalg.svd(centered, full_matrices=False)
+                    coords = centered @ Vt[:3].T
+                else:
+                    # Single point — place at origin
+                    coords = np.zeros((len(features), 3))
+                for i, cp in enumerate(all_points):
+                    points_3d.append({
+                        "id": cp.id,
+                        "name": Path(cp.file_path).name,
+                        "path": cp.file_path,
+                        "x": float(coords[i, 0]),
+                        "y": float(coords[i, 1]),
+                        "z": float(coords[i, 2]),
+                        "domain": cp.dominant_domain,
+                        "lines": cp.line_count,
+                    })
             return {
                 "format": "3d",
-                "description": "Simplified 3D coordinates (axis centroids)",
-                "axes": {"x": "lexical", "y": "structural", "z": "semantic"},
+                "description": "PCA projection of 63D feature space to 3D",
+                "axes": {"x": "PC1", "y": "PC2", "z": "PC3"},
                 "points": points_3d,
                 "count": len(points_3d),
             }
@@ -934,6 +949,34 @@ class DeltaCodeCube:
             ),
         )
         self.conn.commit()
+
+    def prune_stale_files(self) -> list[str]:
+        """Remove indexed files that no longer exist on disk.
+
+        Returns:
+            List of file paths that were pruned from the index.
+        """
+        all_points = self._get_all_code_points()
+        pruned = []
+
+        for cp in all_points:
+            if not Path(cp.file_path).exists():
+                self.conn.execute(
+                    "DELETE FROM code_points WHERE id = ?",
+                    (cp.id,),
+                )
+                # Also clean up contracts referencing this file
+                self.conn.execute(
+                    "DELETE FROM contracts WHERE file_a = ? OR file_b = ?",
+                    (cp.file_path, cp.file_path),
+                )
+                pruned.append(cp.file_path)
+
+        if pruned:
+            self.conn.commit()
+            logger.info(f"Pruned {len(pruned)} stale files from index")
+
+        return pruned
 
     def _get_code_point_by_path(self, file_path: str) -> CodePoint | None:
         """Get CodePoint by file path."""
