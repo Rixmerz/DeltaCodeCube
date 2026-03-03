@@ -4,6 +4,7 @@ from typing import Any
 
 from deltacodecube.db.database import get_connection
 from deltacodecube.cube import DeltaCodeCube
+from deltacodecube.utils import convert_numpy_types
 
 
 def register_delta_tools(mcp):
@@ -30,7 +31,7 @@ def register_delta_tools(mcp):
         """
         with get_connection() as conn:
             cube = DeltaCodeCube(conn)
-            return cube.reindex_file(path)
+            return convert_numpy_types(cube.reindex_file(path))
 
     @mcp.tool()
     def cube_analyze_impact(path: str) -> dict[str, Any]:
@@ -51,7 +52,7 @@ def register_delta_tools(mcp):
         """
         with get_connection() as conn:
             cube = DeltaCodeCube(conn)
-            return cube.analyze_impact(path)
+            return convert_numpy_types(cube.analyze_impact(path))
 
     @mcp.tool()
     def cube_get_tensions(
