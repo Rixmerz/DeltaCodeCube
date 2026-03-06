@@ -45,6 +45,10 @@ def init_database(db_path: Path | str | None = None) -> sqlite3.Connection:
     _connection.executescript(SCHEMA_SQL)
     _connection.commit()
 
+    # Run migrations for new tables
+    from deltacodecube.db.migrations import run_migrations
+    run_migrations(_connection)
+
     logger.info("Database initialized successfully")
     return _connection
 

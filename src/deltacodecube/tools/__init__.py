@@ -15,6 +15,7 @@ from deltacodecube.tools.deltas import register_delta_tools
 from deltacodecube.tools.search import register_search_tools
 from deltacodecube.tools.analysis import register_analysis_tools
 from deltacodecube.tools.visualizations import register_visualization_tools
+from deltacodecube.tools.security import register_security_tools
 
 
 def register_all_tools(mcp):
@@ -25,3 +26,4 @@ def register_all_tools(mcp):
     register_search_tools(mcp)
     register_analysis_tools(mcp)
     register_visualization_tools(mcp)
+    register_security_tools(mcp)

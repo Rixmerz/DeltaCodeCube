@@ -364,6 +364,25 @@ def calculate_technical_debt(conn: sqlite3.Connection) -> dict[str, Any]:
     return calculator.calculate_all()
 
 
+def get_file_debt_score(conn: sqlite3.Connection, file_path: str) -> float:
+    """Get normalized debt score for a file (0.0-1.0).
+
+    Used by the hybrid risk calculator to factor in technical debt.
+
+    Args:
+        conn: Database connection.
+        file_path: Path to the file.
+
+    Returns:
+        Normalized debt score (0-1), where 1 = maximum debt.
+    """
+    calculator = TechnicalDebtCalculator(conn)
+    result = calculator.calculate_for_file(file_path)
+    if result is None:
+        return 0.0
+    return min(1.0, result.score / 100.0)
+
+
 def calculate_file_debt(conn: sqlite3.Connection, file_path: str) -> dict[str, Any]:
     """
     Calculate technical debt for a specific file.

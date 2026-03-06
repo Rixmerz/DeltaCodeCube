@@ -40,6 +40,7 @@ dev = [
 
 [project.scripts]
 deltacodecube = "deltacodecube.__main__:main"
+dcc-gate = "deltacodecube.cli.gatekeeper:main"
 
 [project.urls]
 Homepage = "https://github.com/Rixmerz/DeltaCodeCube"

@@ -1,0 +1,87 @@
+name: DCC Security Gate
+
+on:
+  pull_request:
+    branches: [main, master]
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+    inputs:
+      max_grade:
+        description: 'Maximum allowed risk grade (S/A/B/C/D)'
+        default: 'B'
+        type: choice
+        options: ['S', 'A', 'B', 'C', 'D']
+      max_open_criticals:
+        description: 'Maximum open critical findings'
+        default: '0'
+        type: string
+
+jobs:
+  security-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install DeltaCodeCube
+        run: |
+          pip install -e .
+
+      - name: Install Semgrep
+        run: pip install semgrep
+
+      - name: Install Trivy
+        run: |
+          curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
+
+      - name: Index codebase
+        run: |
+          python -c "
+          from deltacodecube.db.database import init_database
+          from deltacodecube.tools.core import register_core_tools
+          init_database()
+          "
+
+      - name: Run security scan
+        run: |
+          # Run Semgrep
+          semgrep --config auto --sarif --output semgrep.sarif . || true
+          # Run Trivy
+          trivy fs --format sarif --output trivy.sarif . || true
+
+      - name: Ingest SARIF results
+        run: |
+          python -c "
+          from deltacodecube.db.database import init_database
+          from deltacodecube.cube.security.sarif import SARIFIngester
+          import json, os
+          conn = init_database()
+          ingester = SARIFIngester(conn)
+          for f in ['semgrep.sarif', 'trivy.sarif']:
+              if os.path.exists(f):
+                  result = ingester.ingest_file(f)
+                  print(f'{f}: {json.dumps(result)}')
+          "
+
+      - name: Calculate risks
+        run: |
+          python -c "
+          from deltacodecube.db.database import init_database
+          from deltacodecube.cube.security.risk import HybridRiskCalculator
+          conn = init_database()
+          calc = HybridRiskCalculator(conn)
+          import json
+          print(json.dumps(calc.calculate_all(), indent=2, default=str))
+          "
+
+      - name: Run security gate
+        run: |
+          dcc-gate \
+            --max-grade ${{ inputs.max_grade || 'B' }} \
+            --max-open-criticals ${{ inputs.max_open_criticals || '0' }} \
+            --format json

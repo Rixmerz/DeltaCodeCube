@@ -540,6 +540,37 @@ class TensionDetector:
         }
 
 
+def get_file_tension_score(conn: sqlite3.Connection, file_path: str) -> float:
+    """Get normalized tension score for a file (0.0-1.0).
+
+    Calculates based on the count and magnitude of active tensions
+    on the file's contracts.
+
+    Args:
+        conn: Database connection.
+        file_path: Path to the file.
+
+    Returns:
+        Normalized tension score (0-1), where 1 = extreme tension.
+    """
+    row = conn.execute("""
+        SELECT COUNT(*) as tension_count,
+               COALESCE(AVG(t.tension_magnitude), 0) as avg_magnitude
+        FROM tensions t
+        JOIN contracts c ON t.contract_id = c.id
+        JOIN code_points cp ON c.callee_id = cp.id
+        WHERE cp.file_path LIKE ? AND t.status = 'detected'
+    """, (f"%{file_path}%",)).fetchone()
+
+    if not row or row["tension_count"] == 0:
+        return 0.0
+
+    # Normalize: count contributes 60%, avg magnitude 40%
+    count_score = min(1.0, row["tension_count"] / 5.0)
+    mag_score = min(1.0, row["avg_magnitude"] * 2.0)
+    return min(1.0, count_score * 0.6 + mag_score * 0.4)
+
+
 def _generate_tension_id(contract_id: str, delta_id: str) -> str:
     """Generate unique ID for a tension."""
     combined = f"{contract_id}:{delta_id}"

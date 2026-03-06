@@ -480,6 +480,35 @@ def analyze_dependency_graph(conn: sqlite3.Connection, top_n: int = 10) -> dict[
     return analysis.to_dict()
 
 
+def get_file_centrality_score(conn: sqlite3.Connection, file_path: str) -> float:
+    """Get normalized centrality score for a file (0.0-1.0).
+
+    Combines PageRank and betweenness into a single score.
+    Used by the hybrid risk calculator.
+
+    Args:
+        conn: Database connection.
+        file_path: Path to the file.
+
+    Returns:
+        Normalized centrality score (0-1), where 1 = critical hub.
+    """
+    graph = DependencyGraph(conn)
+    graph.build_graph()
+    graph.compute_pagerank()
+    graph.compute_betweenness()
+
+    for node in graph.nodes.values():
+        if node.file_path == file_path or node.file_path.endswith(file_path):
+            # Combine PageRank (importance) and betweenness (bridge-ness)
+            # PageRank is typically small (0-0.1), scale up
+            pr_score = min(1.0, node.pagerank * 10.0)
+            bt_score = min(1.0, node.betweenness * 5.0)
+            return min(1.0, pr_score * 0.6 + bt_score * 0.4)
+
+    return 0.0
+
+
 def get_file_centrality(conn: sqlite3.Connection, file_path: str) -> dict[str, Any] | None:
     """
     Get centrality metrics for a specific file.
